@@ -20,13 +20,8 @@ const MovieGrid = ({ movies, title, cdnUrl }) => {
               className="poster"
               loading="lazy"
             />
-            <div className="poster-overlay">
-              <h3 className="poster-title">{movie.name}</h3>
-              <div className="poster-info">
-                <span style={{color: '#46d369', fontWeight: 'bold'}}>{movie.year}</span>
-                <span className="quality-badge">{movie.quality}</span>
-                <span className="quality-badge">{movie.lang}</span>
-              </div>
+            <div className="poster-info-static">
+              <h3 className="poster-title" title={movie.name}>{movie.name}</h3>
             </div>
           </Link>
         ))}

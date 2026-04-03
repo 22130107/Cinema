@@ -1,6 +1,22 @@
 import { Play, Info } from 'lucide-react';
 import Link from 'next/link';
 
+function generateSlug(str) {
+  str = str.toLowerCase();
+  str = str.replace(/(à|á|ạ|ả|ã|â|ầ|ấ|ậ|ẩ|ẫ|ă|ằ|ắ|ặ|ẳ|ẵ)/g, 'a');
+  str = str.replace(/(è|é|ẹ|ẻ|ẽ|ê|ề|ế|ệ|ể|ễ)/g, 'e');
+  str = str.replace(/(ì|í|ị|ỉ|ĩ)/g, 'i');
+  str = str.replace(/(ò|ó|ọ|ỏ|õ|ô|ồ|ố|ộ|ổ|ỗ|ơ|ờ|ớ|ợ|ở|ỡ)/g, 'o');
+  str = str.replace(/(ù|ú|ụ|ủ|ũ|ư|ừ|ứ|ự|ử|ữ)/g, 'u');
+  str = str.replace(/(ỳ|ý|ỵ|ỷ|ỹ)/g, 'y');
+  str = str.replace(/(đ)/g, 'd');
+  str = str.replace(/([^a-z0-9-\s])/g, '');
+  str = str.replace(/(\s+)/g, '-');
+  str = str.replace(/^-+/g, '');
+  str = str.replace(/-+$/g, '');
+  return str;
+}
+
 export default async function Home() {
   let moviesByCategory = {};
   let featuredMovie = null;
@@ -73,7 +89,12 @@ export default async function Home() {
       <div className="rows-container">
         {Object.entries(moviesByCategory).map(([category, crMovies]) => (
           <div className="row" key={category}>
-            <h2 className="row-title">{category}</h2>
+            <div className="row-header">
+              <h2 className="row-title">{category}</h2>
+              <Link href={category === 'Phim Mới Cập Nhật' ? '/danh-sach/phim-moi' : `/the-loai/${generateSlug(category)}`} className="view-all-btn">
+                Xem tất cả &#8250;
+              </Link>
+            </div>
             <div className="row-posters">
               {crMovies.map(movie => (
                 <Link href={`/phim/${movie.slug}`} className="poster-card" key={movie._id}>
@@ -83,13 +104,8 @@ export default async function Home() {
                     className="poster"
                     loading="lazy"
                   />
-                  <div className="poster-overlay">
-                    <h3 className="poster-title">{movie.name}</h3>
-                    <div className="poster-info">
-                      <span style={{color: '#46d369', fontWeight: 'bold'}}>{movie.year}</span>
-                      <span className="quality-badge">{movie.quality}</span>
-                      <span className="quality-badge">{movie.lang}</span>
-                    </div>
+                  <div className="poster-info-static">
+                    <h3 className="poster-title" title={movie.name}>{movie.name}</h3>
                   </div>
                 </Link>
               ))}
