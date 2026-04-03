@@ -1,5 +1,8 @@
+'use client';
+
 import { Play, Info } from 'lucide-react';
 import Link from 'next/link';
+import { useState, useEffect } from 'react';
 
 function generateSlug(str) {
   str = str.toLowerCase();
@@ -17,46 +20,159 @@ function generateSlug(str) {
   return str;
 }
 
-export default async function Home() {
-  let moviesByCategory = {};
-  let featuredMovie = null;
-  let cdnUrl = '';
-
-  try {
-    const res = await fetch('https://ophim1.com/v1/api/home', { next: { revalidate: 3600 } });
-    const json = await res.json();
+const MovieSection = ({ title, movies, tabs, cdnUrl, selectedTab, onTabChange, viewAllLink }) => {
+  // Sort movies by year (newest first), then by rating (highest first)
+  const sortedMovies = [...movies].sort((a, b) => {
+    const yearA = a.year || 0;
+    const yearB = b.year || 0;
     
-    if (json.status === 'success') {
-      const fetchedMovies = json.data.items;
-      cdnUrl = json.data.APP_DOMAIN_CDN_IMAGE;
-
-      if (fetchedMovies.length > 0) {
-        featuredMovie = fetchedMovies[0];
-
-        const categoriesObj = {};
-        fetchedMovies.forEach(movie => {
-          if (movie.category && movie.category.length > 0) {
-            movie.category.forEach(cat => {
-              if (!categoriesObj[cat.name]) categoriesObj[cat.name] = [];
-              categoriesObj[cat.name].push(movie);
-            });
-          }
-        });
-
-        const filteredCategories = {};
-        Object.keys(categoriesObj).forEach(cat => {
-          if (categoriesObj[cat].length >= 3) {
-            filteredCategories[cat] = categoriesObj[cat];
-          }
-        });
-        
-        filteredCategories['Phim Mới Cập Nhật'] = fetchedMovies.slice(0, 15);
-        moviesByCategory = filteredCategories;
-      }
+    // Sort by year first (descending - newer first)
+    if (yearA !== yearB) {
+      return yearB - yearA;
     }
-  } catch (err) {
-    console.error('Lỗi khi gọi API:', err);
-  }
+    
+    // If same year, sort by rating (descending - highest first)
+    const ratingA = a.tmdb?.vote_average || a.imdb?.vote_average || 0;
+    const ratingB = b.tmdb?.vote_average || b.imdb?.vote_average || 0;
+    return ratingB - ratingA;
+  });
+
+  return (
+    <div className="section-wrapper">
+      <div className="section-header">
+        <h2 className="section-title">{title}</h2>
+        {tabs && tabs.length > 0 && (
+          <div className="category-tabs">
+            {tabs.map(tab => (
+              <button
+                key={tab}
+                className={`tab-btn ${selectedTab === tab ? 'active' : ''}`}
+                onClick={() => onTabChange(tab)}
+              >
+                {tab}
+              </button>
+            ))}
+          </div>
+        )}
+        {viewAllLink && (
+          <Link href={viewAllLink} className="view-all-link">
+            Xem tất cả &#8250;
+          </Link>
+        )}
+      </div>
+
+      <div className="movies-row">
+        {sortedMovies && sortedMovies.length > 0 ? sortedMovies.map(movie => {
+          const rating = movie.tmdb?.vote_average || movie.imdb?.vote_average;
+          return (
+            <Link href={`/phim/${movie.slug}`} className="grid-poster-card-row" key={movie._id}>
+              <div className="poster-container">
+                <img 
+                  src={`${cdnUrl}/uploads/movies/${movie.thumb_url}`} 
+                  alt={movie.name} 
+                  className="poster"
+                  loading="lazy"
+                />
+                {movie.quality && (
+                  <span className="quality-tag">{movie.quality}</span>
+                )}
+                {rating && (
+                  <span className="rating-tag">⭐ {rating.toFixed(1)}</span>
+                )}
+              </div>
+              <h3 className="grid-poster-title" title={movie.name}>{movie.name}</h3>
+              {movie.year && <p className="movie-year">{movie.year}</p>}
+            </Link>
+          );
+        }) : (
+          <div style={{ color: '#999', padding: '20px' }}>
+            Đang tải phim...
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+export default function Home() {
+  const [featuredMovie, setFeaturedMovie] = useState(null);
+  const [cdnUrl, setCdnUrl] = useState('');
+  const [allMovies, setAllMovies] = useState([]);
+  const [countryTabs, setCountryTabs] = useState([]);
+  const [selectedCountry, setSelectedCountry] = useState(null);
+  const [genreTabs, setGenreTabs] = useState([]);
+  const [selectedGenre, setSelectedGenre] = useState(null);
+  
+  const [phimChieuRapMovies, setPhimChieuRapMovies] = useState([]);
+  const [phimBoMovies, setPhimBoMovies] = useState([]);
+  const [phimLeMovies, setPhimLeMovies] = useState([]);
+  const [phimHoatHinhMovies, setPhimHoatHinhMovies] = useState([]);
+
+  useEffect(() => {
+    const fetchAllData = async () => {
+      try {
+        // Fetch home data (featured)
+        const homeRes = await fetch('https://ophim1.com/v1/api/home');
+        const homeJson = await homeRes.json();
+        
+        if (homeJson.status === 'success') {
+          const fetchedMovies = homeJson.data.items;
+          const cdn = homeJson.data.APP_DOMAIN_CDN_IMAGE;
+          setCdnUrl(cdn);
+          setAllMovies(fetchedMovies);
+
+          if (fetchedMovies.length > 0) {
+            setFeaturedMovie(fetchedMovies[0]);
+          }
+        }
+        
+        // Fetch phim chiếu rạp (cinema movies)
+        const chieuRapRes = await fetch('https://ophim1.com/v1/api/danh-sach/phim-chieu-rap?page=1');
+        const chieuRapJson = await chieuRapRes.json();
+        if (chieuRapJson.status === 'success') {
+          const movies = (chieuRapJson.data.items || []).slice(0, 14);
+          setPhimChieuRapMovies(movies);
+        }
+        
+        // Fetch phim bộ (series movies)
+        const boRes = await fetch('https://ophim1.com/v1/api/danh-sach/phim-bo?page=1');
+        const boJson = await boRes.json();
+        if (boJson.status === 'success') {
+          const movies = (boJson.data.items || []).slice(0, 14);
+          setPhimBoMovies(movies);
+        }
+        
+        // Fetch phim lẻ (single movies)
+        const leRes = await fetch('https://ophim1.com/v1/api/danh-sach/phim-le?page=1');
+        const leJson = await leRes.json();
+        if (leJson.status === 'success') {
+          const movies = (leJson.data.items || []).slice(0, 14);
+          setPhimLeMovies(movies);
+        }
+        
+        // Fetch phim hoạt hình (animated movies)
+        const hoatHinhRes = await fetch('https://ophim1.com/v1/api/danh-sach/hoat-hinh?page=1');
+        const hoatHinhJson = await hoatHinhRes.json();
+        if (hoatHinhJson.status === 'success') {
+          const movies = (hoatHinhJson.data.items || []).slice(0, 14);
+          setPhimHoatHinhMovies(movies);
+        }
+        
+      } catch (err) {
+        console.error('Lỗi khi gọi API:', err);
+      }
+    };
+
+    fetchAllData();
+  }, []);
+
+  const handleGenreChange = (genre) => {
+    setSelectedGenre(genre);
+  };
+
+  const handleCountryChange = (country) => {
+    setSelectedCountry(country);
+  };
 
   const billboardImg = featuredMovie ? `${cdnUrl}/uploads/movies/${featuredMovie.thumb_url}` : '';
 
@@ -85,34 +201,49 @@ export default async function Home() {
         </header>
       )}
 
-      {/* Movie Rows */}
-      <div className="rows-container">
-        {Object.entries(moviesByCategory).map(([category, crMovies]) => (
-          <div className="row" key={category}>
-            <div className="row-header">
-              <h2 className="row-title">{category}</h2>
-              <Link href={category === 'Phim Mới Cập Nhật' ? '/danh-sach/phim-moi' : `/the-loai/${generateSlug(category)}`} className="view-all-btn">
-                Xem tất cả &#8250;
-              </Link>
-            </div>
-            <div className="row-posters">
-              {crMovies.map(movie => (
-                <Link href={`/phim/${movie.slug}`} className="poster-card" key={movie._id}>
-                  <img 
-                    src={`${cdnUrl}/uploads/movies/${movie.thumb_url}`} 
-                    alt={movie.name} 
-                    className="poster"
-                    loading="lazy"
-                  />
-                  <div className="poster-info-static">
-                    <h3 className="poster-title" title={movie.name}>{movie.name}</h3>
-                  </div>
-                </Link>
-              ))}
-            </div>
-          </div>
-        ))}
-      </div>
+      {/* Section 1: PHIM CHIẾU RẠP MỚI */}
+      <MovieSection
+        title="PHIM CHIẾU RẠP MỚI"
+        movies={phimChieuRapMovies}
+        tabs={['2025', '2024', '2023', '2022']}
+        cdnUrl={cdnUrl}
+        selectedTab="2025"
+        onTabChange={() => {}}
+        viewAllLink="/danh-sach/phim-chieu-rap"
+      />
+
+      {/* Section 2: PHIM BỘ */}
+      <MovieSection
+        title="PHIM BỘ"
+        movies={phimBoMovies}
+        tabs={['2025', '2024', '2023', '2022']}
+        cdnUrl={cdnUrl}
+        selectedTab="2025"
+        onTabChange={() => {}}
+        viewAllLink="/danh-sach/phim-bo"
+      />
+
+      {/* Section 3: PHIM LẺ */}
+      <MovieSection
+        title="PHIM LẺ"
+        movies={phimLeMovies}
+        tabs={['2025', '2024', '2023', '2022']}
+        cdnUrl={cdnUrl}
+        selectedTab="2025"
+        onTabChange={() => {}}
+        viewAllLink="/danh-sach/phim-le"
+      />
+
+      {/* Section 4: PHIM HOẠT HÌNH */}
+      <MovieSection
+        title="PHIM HOẠT HÌNH"
+        movies={phimHoatHinhMovies}
+        tabs={['2025', '2024', '2023', '2022']}
+        cdnUrl={cdnUrl}
+        selectedTab="2025"
+        onTabChange={() => {}}
+        viewAllLink="/danh-sach/hoat-hinh"
+      />
     </div>
   );
 }

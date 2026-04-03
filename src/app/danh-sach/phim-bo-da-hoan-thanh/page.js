@@ -3,77 +3,48 @@
 import { useState, useEffect } from 'react';
 import HeroSlider from '../../../components/HeroSlider';
 import MovieListingClient from '../../../components/MovieListingClient';
-import { useParams } from 'next/navigation';
 
-export default function DanhSachPage() {
-  const params = useParams();
-  const slug = params?.slug;
-
+export default function PhimBoDaHoanThanhPage() {
   const [movies, setMovies] = useState([]);
   const [cdnUrl, setCdnUrl] = useState('');
-  const [title, setTitle] = useState(slug || '');
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const fetchMovies = async () => {
-      if (!slug) return;
-
       try {
         setLoading(true);
         let allMovies = [];
         let allCdnUrl = '';
         const seenIds = new Set();
 
-        // Fetch 10 pages for comprehensive dataset per endpoint
+        // Fetch phim-bo-da-hoan-thanh
         for (let page = 1; page <= 10; page++) {
           try {
-            const res = await fetch(`https://ophim1.com/v1/api/danh-sach/${slug}?page=${page}`, {
-              signal: AbortSignal.timeout(5000) // 5s timeout
-            });
-            
-            if (!res.ok) {
-              console.warn(`Page ${page} returned status ${res.status}`);
-              break;
-            }
-
+            const res = await fetch(`https://ophim1.com/v1/api/danh-sach/phim-bo-da-hoan-thanh?page=${page}`);
             const json = await res.json();
 
             if (json.status === 'success' && json.data?.items) {
-              // Filter out duplicates and movies with incomplete data
               const uniqueMovies = json.data.items.filter(movie => {
                 if (!movie._id || !movie.name) return false;
                 if (seenIds.has(movie._id)) return false;
                 seenIds.add(movie._id);
                 return true;
               });
-
               allMovies = [...allMovies, ...uniqueMovies];
-
-              if (!allCdnUrl && json.data.APP_DOMAIN_CDN_IMAGE) {
-                allCdnUrl = json.data.APP_DOMAIN_CDN_IMAGE;
-              }
+              if (!allCdnUrl) allCdnUrl = json.data.APP_DOMAIN_CDN_IMAGE;
             } else {
-              // Stop fetching if we get an error or empty result
-              if (page === 1) {
-                console.warn(`Danh-sach endpoint "${slug}" returned no data or error`);
-              }
               break;
             }
-          } catch (pageErr) {
-            if (page === 1) {
-              console.error(`Failed to fetch page 1 for ${slug}:`, pageErr);
-              break;
-            }
-            // Continue if later pages fail
-            continue;
+          } catch (err) {
+            if (page === 1) console.error('Failed to fetch phim-bo-da-hoan-thanh:', err);
+            break;
           }
         }
 
         setCdnUrl(allCdnUrl || 'https://img.ophim.live');
         setMovies(allMovies);
-        setTitle(slug.replace(/-/g, ' '));
       } catch (err) {
-        console.error('Lỗi tải danh sách:', err);
+        console.error('Lỗi tải phim bộ đã hoàn thành:', err);
         setMovies([]);
       } finally {
         setLoading(false);
@@ -81,17 +52,16 @@ export default function DanhSachPage() {
     };
 
     fetchMovies();
-  }, [slug]);
+  }, []);
 
   const sliderMovies = movies.slice(0, 8);
 
   return (
     <div style={{ paddingBottom: '40px' }}>
-      {/* Hero Slider */}
       <HeroSlider movies={sliderMovies} cdnUrl={cdnUrl} />
 
       <div style={{ padding: '40px 4vw 0' }}>
-        <h1 style={{ fontSize: '2rem', marginBottom: '30px' }}>{title}</h1>
+        <h1 style={{ fontSize: '2rem', marginBottom: '30px' }}>Phim Bộ Đã Hoàn Thành</h1>
       </div>
 
       <div style={{ padding: '0 4vw' }}>
@@ -99,11 +69,15 @@ export default function DanhSachPage() {
           <div style={{ textAlign: 'center', padding: '40px', color: '#999' }}>
             Đang tải...
           </div>
+        ) : movies.length === 0 ? (
+          <div style={{ textAlign: 'center', padding: '40px', color: '#999' }}>
+            Không tìm thấy phim
+          </div>
         ) : (
           <MovieListingClient
             movies={movies}
             cdnUrl={cdnUrl}
-            title={title}
+            title="Phim Bộ Đã Hoàn Thành"
             allowFiltering={true}
             sortOptions={['year', 'rating']}
           />

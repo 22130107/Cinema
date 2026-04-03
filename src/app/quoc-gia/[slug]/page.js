@@ -1,6 +1,5 @@
 import HeroSlider from '../../../components/HeroSlider';
-import MovieGrid from '../../../components/MovieGrid';
-import Pagination from '../../../components/Pagination';
+import MovieListingClient from '../../../components/MovieListingClient';
 
 export async function generateMetadata({ params }) {
   const { slug } = await params;
@@ -10,31 +9,26 @@ export async function generateMetadata({ params }) {
 export default async function QuocGiaPage({ params, searchParams }) {
   const { slug } = await params;
   const sp = await searchParams;
-  const page = Number(sp?.page) || 1;
 
   let movies = [];
   let cdnUrl = '';
   let title = slug;
-  let totalPages = 1;
 
   try {
-    const res = await fetch(
-      `https://ophim1.com/v1/api/quoc-gia/${slug}?page=${page}`,
-      { next: { revalidate: 3600 } }
-    );
-    const json = await res.json();
+    // Fetch 3 pages to get ~72 movies for better filtering
+    for (let page = 1; page <= 3; page++) {
+      const res = await fetch(
+        `https://ophim1.com/v1/api/quoc-gia/${slug}?page=${page}`,
+        { next: { revalidate: 3600 } }
+      );
+      const json = await res.json();
 
-    if (json.status === 'success') {
-      movies = json.data.items || [];
-      cdnUrl = json.data.APP_DOMAIN_CDN_IMAGE || 'https://img.ophim.live';
-      title = json.data.titlePage || slug;
-
-      const pagination = json.data.params?.pagination;
-      if (pagination) {
-        totalPages =
-          pagination.totalPages ||
-          Math.ceil(pagination.totalItems / pagination.totalItemsPerPage) ||
-          1;
+      if (json.status === 'success') {
+        movies = [...movies, ...(json.data.items || [])];
+        if (!cdnUrl) {
+          cdnUrl = json.data.APP_DOMAIN_CDN_IMAGE || 'https://img.ophim.live';
+          title = json.data.titlePage || slug;
+        }
       }
     }
   } catch (err) {
@@ -48,17 +42,12 @@ export default async function QuocGiaPage({ params, searchParams }) {
       <HeroSlider movies={sliderMovies} cdnUrl={cdnUrl} />
 
       <div style={{ padding: '40px 4vw 0' }}>
-        <h1 style={{ fontSize: '2rem', marginBottom: '10px' }}>{title}</h1>
-        <p style={{ color: 'var(--text-secondary)', marginBottom: '30px' }}>Trang {page} / {totalPages}</p>
+        <h1 style={{ fontSize: '2rem', marginBottom: '30px' }}>{title}</h1>
       </div>
 
-      <MovieGrid movies={movies} cdnUrl={cdnUrl} title="" />
-
-      <Pagination
-        currentPage={page}
-        totalPages={totalPages}
-        basePath={`/quoc-gia/${slug}`}
-      />
+      <div style={{ padding: '0 4vw' }}>
+        <MovieListingClient movies={movies} cdnUrl={cdnUrl} title={title} allowFiltering={true} />
+      </div>
     </div>
   );
 }
