@@ -12,6 +12,16 @@ export default function MovieListingClient({
   sortOptions = ['year', 'rating'],
   itemsPerPage = 24
 }) {
+  const getMovieRatingNumber = (movie) => {
+    const tmdb = Number(movie?.tmdb?.vote_average);
+    if (Number.isFinite(tmdb) && tmdb > 0) return tmdb;
+
+    const imdb = Number(movie?.imdb?.vote_average);
+    if (Number.isFinite(imdb) && imdb > 0) return imdb;
+
+    return null;
+  };
+
   const movieList = initialMovies || movies || [];
   const [sortBy, setSortBy] = useState(sortOptions[0] || 'year');
   const [currentPage, setCurrentPage] = useState(1);
@@ -110,13 +120,13 @@ export default function MovieListingClient({
       if (sortBy === 'year') {
         const yearDiff = (parseInt(b.year, 10) || 0) - (parseInt(a.year, 10) || 0);
         if (yearDiff !== 0) return yearDiff;
-        const ratingA = a.tmdb?.vote_average || a.imdb?.vote_average || 0;
-        const ratingB = b.tmdb?.vote_average || b.imdb?.vote_average || 0;
+        const ratingA = getMovieRatingNumber(a) ?? 0;
+        const ratingB = getMovieRatingNumber(b) ?? 0;
         return ratingB - ratingA;
       }
       if (sortBy === 'rating') {
-        const ratingA = a.tmdb?.vote_average || a.imdb?.vote_average || 0;
-        const ratingB = b.tmdb?.vote_average || b.imdb?.vote_average || 0;
+        const ratingA = getMovieRatingNumber(a) ?? 0;
+        const ratingB = getMovieRatingNumber(b) ?? 0;
         return ratingB - ratingA;
       }
       return 0;
@@ -332,9 +342,7 @@ export default function MovieListingClient({
               gap: '15px',
             }}>
               {paginatedMovies.map(movie => {
-                const ratingTmdb = movie.tmdb?.vote_average;
-                const ratingImdb = movie.imdb?.vote_average;
-                const rating = (ratingTmdb && ratingTmdb > 0) ? ratingTmdb : (ratingImdb && ratingImdb > 0) ? ratingImdb : null;
+                const rating = getMovieRatingNumber(movie);
                 return (
                   <Link
                     href={`/phim/${movie.slug}`}
@@ -375,7 +383,7 @@ export default function MovieListingClient({
                           {movie.quality}
                         </span>
                       )}
-                      {rating && (
+                      {rating !== null && (
                         <span style={{
                           position: 'absolute',
                           bottom: '8px',

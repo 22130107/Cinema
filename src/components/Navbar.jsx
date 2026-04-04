@@ -83,28 +83,32 @@ const TOP_SECTIONS = [
 
 // Danh Sách Phim
 const MOVIE_LISTS = [
-  { name: 'Phim Mới', slug: 'danh-sach/phim-moi', icon: '✨' },
-  { name: 'Phim Bộ', slug: 'danh-sach/phim-bo', icon: '📺' },
-  { name: 'Phim Lẻ', slug: 'danh-sach/phim-le', icon: '🎬' },
-  { name: 'Shows', slug: 'danh-sach/shows', icon: '🎭' },
-  { name: 'Hoạt Hình', slug: 'danh-sach/hoat-hinh', icon: '🎨' },
-  { name: 'Phim Vietsub', slug: 'danh-sach/vietsub', icon: '🇻🇳' },
-  { name: 'Phim Thuyết Minh', slug: 'danh-sach/thuyet-minh', icon: '🔊' },
-  { name: 'Phim Lồng Tiếng', slug: 'danh-sach/long-tieng', icon: '🎙️' },
-  { name: 'Phim Bộ Đã Hoàn Thành', slug: 'danh-sach/phim-bo-da-hoan-thanh', icon: '✅' },
-  { name: 'Phim Bộ Đang Chiếu', slug: 'danh-sach/phim-bo-dang-chieu', icon: '🔴' },
-  { name: 'Phim Sắp Chiếu', slug: 'danh-sach/phim-sap-chieu', icon: '⏰' },
-  { name: 'Phim Chiếu Rạp', slug: 'danh-sach/phim-chieu-rap', icon: '🎥' },
+  { name: 'Phim Mới', slug: 'danh-sach/phim-moi' },
+  { name: 'Phim Bộ', slug: 'danh-sach/phim-bo' },
+  { name: 'Phim Lẻ', slug: 'danh-sach/phim-le' },
+  { name: 'Shows', slug: 'danh-sach/shows' },
+  { name: 'Hoạt Hình', slug: 'danh-sach/hoat-hinh' },
+  { name: 'Phim Vietsub', slug: 'danh-sach/vietsub' },
+  { name: 'Phim Thuyết Minh', slug: 'danh-sach/thuyet-minh' },
+  { name: 'Phim Lồng Tiếng', slug: 'danh-sach/long-tieng' },
+  { name: 'Phim Bộ Đã Hoàn Thành', slug: 'danh-sach/phim-bo-da-hoan-thanh' },
+  { name: 'Phim Bộ Đang Chiếu', slug: 'danh-sach/phim-bo-dang-chieu' },
+  { name: 'Phim Sắp Chiếu', slug: 'danh-sach/phim-sap-chieu' },
+  { name: 'Phim Chiếu Rạp', slug: 'danh-sach/phim-chieu-rap' },
 ];
 
 const Navbar = () => {
   const [isScrolled, setIsScrolled] = useState(false);
   const [showSearch, setShowSearch] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [suggestions, setSuggestions] = useState([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [isSuggesting, setIsSuggesting] = useState(false);
   const [activeDropdown, setActiveDropdown] = useState(null);
   const router = useRouter();
   const pathname = usePathname();
   const navRef = useRef(null);
+  const abortRef = useRef(null);
 
   useEffect(() => {
     const handleScroll = () => setIsScrolled(window.scrollY > 50);
@@ -117,6 +121,7 @@ const Navbar = () => {
     const handleClickOutside = (e) => {
       if (navRef.current && !navRef.current.contains(e.target)) {
         setActiveDropdown(null);
+        setShowSuggestions(false);
       }
     };
     document.addEventListener('mousedown', handleClickOutside);
@@ -127,15 +132,83 @@ const Navbar = () => {
   useEffect(() => {
     setActiveDropdown(null);
     setShowSearch(false);
+    setShowSuggestions(false);
+    setSuggestions([]);
+    setSearchQuery('');
   }, [pathname]);
+
+  // Gợi ý tìm kiếm (AJAX) - giới hạn 5 phim
+  useEffect(() => {
+    if (!showSearch) return;
+
+    const q = searchQuery.trim();
+    if (q.length < 2) {
+      setSuggestions([]);
+      setIsSuggesting(false);
+      return;
+    }
+
+    setIsSuggesting(true);
+
+    const handle = setTimeout(async () => {
+      if (abortRef.current) abortRef.current.abort();
+      const controller = new AbortController();
+      abortRef.current = controller;
+
+      try {
+        const res = await fetch(
+          `https://ophim1.com/v1/api/tim-kiem?keyword=${encodeURIComponent(q)}&page=1`,
+          { signal: controller.signal }
+        );
+        const json = await res.json();
+
+        if (json?.status === 'success') {
+          const items = Array.isArray(json?.data?.items) ? json.data.items : [];
+          setSuggestions(items.slice(0, 5));
+        } else {
+          setSuggestions([]);
+        }
+      } catch (err) {
+        if (err?.name !== 'AbortError') {
+          setSuggestions([]);
+        }
+      } finally {
+        setIsSuggesting(false);
+      }
+    }, 250);
+
+    return () => {
+      clearTimeout(handle);
+      if (abortRef.current) abortRef.current.abort();
+    };
+  }, [searchQuery, showSearch]);
 
   const handleSearch = (e) => {
     e.preventDefault();
     if (searchQuery.trim()) {
       router.push(`/tim-kiem?keyword=${encodeURIComponent(searchQuery.trim())}`);
       setShowSearch(false);
+      setShowSuggestions(false);
+      setSuggestions([]);
       setSearchQuery('');
     }
+  };
+
+  const handleSelectSuggestion = (slug) => {
+    if (!slug) return;
+    router.push(`/phim/${slug}`);
+    setShowSearch(false);
+    setShowSuggestions(false);
+    setSuggestions([]);
+    setSearchQuery('');
+  };
+
+  const closeSearch = () => {
+    if (abortRef.current) abortRef.current.abort();
+    setShowSearch(false);
+    setShowSuggestions(false);
+    setSuggestions([]);
+    setSearchQuery('');
   };
 
   const toggleDropdown = (name) => {
@@ -162,7 +235,6 @@ const Navbar = () => {
               <div className="dropdown-content movie-list-grid">
                 {MOVIE_LISTS.map(item => (
                   <Link key={item.slug} href={`/${item.slug}`} onClick={() => setActiveDropdown(null)}>
-                    <span className="icon">{item.icon}</span>
                     <span>{item.name}</span>
                   </Link>
                 ))}
@@ -218,12 +290,40 @@ const Navbar = () => {
               type="text"
               placeholder="Nhập tên phim..."
               value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
+              onChange={(e) => {
+                setSearchQuery(e.target.value);
+                setShowSuggestions(true);
+              }}
+              onFocus={() => setShowSuggestions(true)}
               className="search-input"
             />
-            <button type="button" className="icon-btn search-close" onClick={() => setShowSearch(false)}>
+            <button type="button" className="icon-btn search-close" onClick={closeSearch}>
               <X size={18} />
             </button>
+
+            {showSuggestions && (suggestions.length > 0 || isSuggesting) && (
+              <div className="search-suggestions" role="listbox">
+                {isSuggesting && suggestions.length === 0 ? (
+                  <div className="search-suggestion muted">Đang tìm...</div>
+                ) : (
+                  suggestions.map((movie) => (
+                    <button
+                      key={movie?._id || movie?.slug}
+                      type="button"
+                      className="search-suggestion"
+                      role="option"
+                      aria-selected="false"
+                      onClick={() => handleSelectSuggestion(movie?.slug)}
+                    >
+                      <span className="search-suggestion-title">{movie?.name || 'Không có tên'}</span>
+                      {movie?.year ? (
+                        <span className="search-suggestion-meta">{movie.year}</span>
+                      ) : null}
+                    </button>
+                  ))
+                )}
+              </div>
+            )}
           </form>
         ) : (
           <button className="icon-btn" onClick={() => setShowSearch(true)} aria-label="Tìm kiếm">

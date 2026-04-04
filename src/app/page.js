@@ -2,7 +2,7 @@
 
 import { Play, Info } from 'lucide-react';
 import Link from 'next/link';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 
 function generateSlug(str) {
   str = str.toLowerCase();
@@ -20,9 +20,23 @@ function generateSlug(str) {
   return str;
 }
 
-const MovieSection = ({ title, movies, tabs, cdnUrl, selectedTab, onTabChange, viewAllLink }) => {
+const MovieSection = ({ title, movies, tabs, cdnUrl, selectedTab, onTabChange, viewAllLink, filterFn, limit }) => {
+  const getMovieRating = (movie) => {
+    const tmdb = Number(movie?.tmdb?.vote_average);
+    if (Number.isFinite(tmdb) && tmdb > 0) return tmdb;
+
+    const imdb = Number(movie?.imdb?.vote_average);
+    if (Number.isFinite(imdb) && imdb > 0) return imdb;
+
+    return null;
+  };
+
+  const filteredMovies = Array.isArray(movies)
+    ? movies.filter((m) => (typeof filterFn === 'function' ? filterFn(m, selectedTab) : true))
+    : [];
+
   // Sort movies by year (newest first), then by rating (highest first)
-  const sortedMovies = [...movies].sort((a, b) => {
+  const sortedMovies = [...filteredMovies].sort((a, b) => {
     const yearA = a.year || 0;
     const yearB = b.year || 0;
     
@@ -32,8 +46,8 @@ const MovieSection = ({ title, movies, tabs, cdnUrl, selectedTab, onTabChange, v
     }
     
     // If same year, sort by rating (descending - highest first)
-    const ratingA = a.tmdb?.vote_average || a.imdb?.vote_average || 0;
-    const ratingB = b.tmdb?.vote_average || b.imdb?.vote_average || 0;
+    const ratingA = getMovieRating(a) ?? 0;
+    const ratingB = getMovieRating(b) ?? 0;
     return ratingB - ratingA;
   });
 
@@ -47,7 +61,7 @@ const MovieSection = ({ title, movies, tabs, cdnUrl, selectedTab, onTabChange, v
               <button
                 key={tab}
                 className={`tab-btn ${selectedTab === tab ? 'active' : ''}`}
-                onClick={() => onTabChange(tab)}
+                onClick={() => onTabChange(selectedTab === tab ? '' : tab)}
               >
                 {tab}
               </button>
@@ -62,10 +76,10 @@ const MovieSection = ({ title, movies, tabs, cdnUrl, selectedTab, onTabChange, v
       </div>
 
       <div className="movies-row">
-        {sortedMovies && sortedMovies.length > 0 ? sortedMovies.map(movie => {
-          const rating = movie.tmdb?.vote_average || movie.imdb?.vote_average;
+        {sortedMovies && sortedMovies.length > 0 ? sortedMovies.slice(0, limit ?? sortedMovies.length).map(movie => {
+          const rating = getMovieRating(movie);
           return (
-            <Link href={`/phim/${movie.slug}`} className="grid-poster-card-row" key={movie._id}>
+            <Link href={`/phim/${movie.slug}`} className="grid-poster-card-row" key={movie._id} title={movie.name}>
               <div className="poster-container">
                 <img 
                   src={`${cdnUrl}/uploads/movies/${movie.thumb_url}`} 
@@ -76,12 +90,20 @@ const MovieSection = ({ title, movies, tabs, cdnUrl, selectedTab, onTabChange, v
                 {movie.quality && (
                   <span className="quality-tag">{movie.quality}</span>
                 )}
-                {rating && (
+                {rating !== null && (
                   <span className="rating-tag">⭐ {rating.toFixed(1)}</span>
                 )}
+
+                <span className="poster-play-btn" aria-hidden="true">
+                  <span className="poster-play-circle">
+                    <Play size={18} fill="currentColor" />
+                  </span>
+                </span>
+
+                <div className="poster-title-overlay">
+                  <h3 className="grid-poster-title" title={movie.name}>{movie.name}</h3>
+                </div>
               </div>
-              <h3 className="grid-poster-title" title={movie.name}>{movie.name}</h3>
-              {movie.year && <p className="movie-year">{movie.year}</p>}
             </Link>
           );
         }) : (
@@ -96,6 +118,10 @@ const MovieSection = ({ title, movies, tabs, cdnUrl, selectedTab, onTabChange, v
 
 export default function Home() {
   const [featuredMovie, setFeaturedMovie] = useState(null);
+  const [featuredPosterUrl, setFeaturedPosterUrl] = useState('');
+  const [featuredPosterStatus, setFeaturedPosterStatus] = useState('idle');
+  const [heroIndex, setHeroIndex] = useState(0);
+  const [heroPosterBySlug, setHeroPosterBySlug] = useState({});
   const [cdnUrl, setCdnUrl] = useState('');
   const [allMovies, setAllMovies] = useState([]);
   const [windowWidth, setWindowWidth] = useState(typeof window !== 'undefined' ? window.innerWidth : 1024);
@@ -104,6 +130,11 @@ export default function Home() {
   const [phimBoMovies, setPhimBoMovies] = useState([]);
   const [phimLeMovies, setPhimLeMovies] = useState([]);
   const [phimHoatHinhMovies, setPhimHoatHinhMovies] = useState([]);
+
+  // Filter tabs (home) - match sample-style UI
+  const [selectedCinemaYear, setSelectedCinemaYear] = useState('');
+  const [selectedSeriesTab, setSelectedSeriesTab] = useState('');
+  const [selectedSingleTab, setSelectedSingleTab] = useState('');
 
   // Calculate movies to show based on window width
   const getMoviesToShow = () => {
@@ -114,6 +145,43 @@ export default function Home() {
   };
 
   const moviesToShow = getMoviesToShow();
+
+  const normalize = (s) => (s || '').toString().trim().toLowerCase();
+
+  const hasCategory = (movie, categoryName) => {
+    if (!Array.isArray(movie?.category) || movie.category.length === 0) return true;
+    return movie.category.some((c) => normalize(c?.name) === normalize(categoryName));
+  };
+
+  const hasCountry = (movie, countryName) => {
+    if (!Array.isArray(movie?.country) || movie.country.length === 0) return true;
+    return movie.country.some((c) => normalize(c?.name) === normalize(countryName));
+  };
+
+  const isFullSeries = (movie) => {
+    const v = normalize(`${movie?.episode_current || ''} ${movie?.episode_total || ''}`);
+    return v.includes('full') || v.includes('hoan') || v.includes('hoàn') || v.includes('tron') || v.includes('trọn');
+  };
+
+  const toAbsoluteMovieImage = (path, cdn) => {
+    if (!path) return '';
+    if (String(path).startsWith('http')) return path;
+    return `${cdn}/uploads/movies/${path}`;
+  };
+
+  const heroMovies = useMemo(() => (
+    Array.isArray(allMovies) ? allMovies.slice(0, 8) : []
+  ), [allMovies]);
+  const activeHeroMovie = heroMovies[heroIndex] || featuredMovie;
+
+  const goToHero = (index) => {
+    if (!heroMovies.length) return;
+    const nextIndex = (index + heroMovies.length) % heroMovies.length;
+    setHeroIndex(nextIndex);
+  };
+
+  const goNextHero = () => goToHero(heroIndex + 1);
+  const goPrevHero = () => goToHero(heroIndex - 1);
 
   // Handle window resize
   useEffect(() => {
@@ -181,74 +249,215 @@ export default function Home() {
     fetchAllData();
   }, []);
 
-  const billboardImg = featuredMovie ? `${cdnUrl}/uploads/movies/${featuredMovie.thumb_url}` : '';
+  useEffect(() => {
+    if (heroMovies.length <= 1) return;
+    const t = setInterval(() => {
+      setHeroIndex((prev) => (prev + 1) % heroMovies.length);
+    }, 8000);
+    return () => clearInterval(t);
+  }, [heroMovies.length]);
+
+  // Lấy poster cho dải thumbnail hero (ưu tiên poster_url từ API chi tiết)
+  useEffect(() => {
+    const targets = heroMovies.slice(0, 6).filter((m) => m?.slug);
+    if (!targets.length) return;
+
+    let canceled = false;
+
+    const loadThumbPosters = async () => {
+      try {
+        const pairs = await Promise.all(
+          targets.map(async (m) => {
+            try {
+              const res = await fetch(`https://ophim1.com/v1/api/phim/${m.slug}`);
+              const json = await res.json();
+              const item = json?.movie || json?.data?.item;
+              const detailCdn = json?.data?.APP_DOMAIN_CDN_IMAGE || cdnUrl || 'https://img.ophim.live';
+              const poster = toAbsoluteMovieImage(item?.poster_url, detailCdn);
+              return [m.slug, poster || ''];
+            } catch {
+              return [m.slug, ''];
+            }
+          })
+        );
+
+        if (!canceled) {
+          setHeroPosterBySlug((prev) => {
+            const next = { ...prev };
+            pairs.forEach(([slug, poster]) => {
+              if (poster) next[slug] = poster;
+            });
+            return next;
+          });
+        }
+      } catch {
+        // no-op: fallback sang poster_url/thumb_url local
+      }
+    };
+
+    loadThumbPosters();
+
+    return () => {
+      canceled = true;
+    };
+  }, [heroMovies, cdnUrl]);
+
+  // Lấy poster_url từ API chi tiết phim cho billboard trang chủ
+  useEffect(() => {
+    if (!activeHeroMovie?.slug) return;
+
+    let canceled = false;
+
+    const fetchFeaturedPoster = async () => {
+      if (!canceled) {
+        setFeaturedPosterStatus('loading');
+        setFeaturedPosterUrl('');
+      }
+
+      try {
+        const res = await fetch(`https://ophim1.com/v1/api/phim/${activeHeroMovie.slug}`);
+        const json = await res.json();
+
+        const item = json?.movie || json?.data?.item;
+        const detailCdn = json?.data?.APP_DOMAIN_CDN_IMAGE || cdnUrl || 'https://img.ophim.live';
+        const poster = toAbsoluteMovieImage(item?.poster_url, detailCdn);
+
+        if (!canceled && poster) {
+          setFeaturedPosterUrl(poster);
+          setFeaturedPosterStatus('loaded');
+        } else if (!canceled) {
+          setFeaturedPosterStatus('failed');
+        }
+      } catch (err) {
+        if (!canceled) {
+          setFeaturedPosterStatus('failed');
+        }
+      }
+    };
+
+    fetchFeaturedPoster();
+
+    return () => {
+      canceled = true;
+    };
+  }, [activeHeroMovie?.slug, cdnUrl]);
+
+  const fallbackThumb = activeHeroMovie
+    ? toAbsoluteMovieImage(activeHeroMovie.thumb_url, cdnUrl || 'https://img.ophim.live')
+    : '';
+  const billboardImg = featuredPosterStatus === 'loaded'
+    ? featuredPosterUrl
+    : featuredPosterStatus === 'failed'
+      ? fallbackThumb
+      : '';
 
   return (
     <div className="home-page">
       {/* Billboard Hero Section */}
-      {featuredMovie && (
+      {activeHeroMovie && (
         <header className="billboard" style={{ backgroundImage: `url(${billboardImg})` }}>
           <div className="billboard-vignette"></div>
           <div className="billboard-info">
-            <h1 className="billboard-title">{featuredMovie.name}</h1>
+            <h1 className="billboard-title">{activeHeroMovie.name}</h1>
             <p className="billboard-desc">
-              Một tác phẩm từ {featuredMovie.country.map(c => c.name).join(', ')}. 
-              Thể loại: {featuredMovie.category.map(c => c.name).join(', ')}. 
-              Năm {featuredMovie.year}.
+              Một tác phẩm từ {(activeHeroMovie.country || []).map(c => c.name).join(', ')}.
+              {' '}Thể loại: {(activeHeroMovie.category || []).map(c => c.name).join(', ')}.
+              {' '}Năm {activeHeroMovie.year}.
             </p>
             <div className="billboard-buttons">
-              <Link href={`/phim/${featuredMovie.slug}`} className="btn btn-play">
+              <Link href={`/phim/${activeHeroMovie.slug}`} className="btn btn-play">
                 <Play size={24} fill="currentColor" /> Phát
               </Link>
-              <Link href={`/phim/${featuredMovie.slug}`} className="btn btn-more">
+              <Link href={`/phim/${activeHeroMovie.slug}`} className="btn btn-more">
                 <Info size={24} /> Thông Tin Khác
               </Link>
             </div>
           </div>
+
+          {heroMovies.length > 1 && (
+            <>
+              <div className="billboard-thumbs">
+                {heroMovies.slice(0, 6).map((m, idx) => {
+                  const thumbSrc = heroPosterBySlug[m?.slug]
+                    || toAbsoluteMovieImage(m?.poster_url || m?.thumb_url, cdnUrl || 'https://img.ophim.live');
+                  return (
+                    <button
+                      key={m._id || m.slug || idx}
+                      type="button"
+                      className={`billboard-thumb ${heroIndex === idx ? 'active' : ''}`}
+                      onClick={() => goToHero(idx)}
+                      title={m?.name || ''}
+                    >
+                      <img src={thumbSrc} alt={m?.name || 'movie'} />
+                    </button>
+                  );
+                })}
+              </div>
+            </>
+          )}
         </header>
       )}
 
       {/* Section 1: PHIM CHIẾU RẠP MỚI */}
       <MovieSection
         title="PHIM CHIẾU RẠP MỚI"
-        movies={phimChieuRapMovies.slice(0, moviesToShow)}
+        movies={phimChieuRapMovies}
         tabs={['2025', '2024', '2023', '2022']}
         cdnUrl={cdnUrl}
-        selectedTab="2025"
-        onTabChange={() => {}}
+        selectedTab={selectedCinemaYear}
+        onTabChange={setSelectedCinemaYear}
+        filterFn={(movie, tab) => {
+          if (!tab) return true;
+          const y = Number(tab);
+          if (!Number.isFinite(y)) return true;
+          const my = Number(movie?.year);
+          if (!Number.isFinite(my)) return true;
+          return my === y;
+        }}
+        limit={moviesToShow}
         viewAllLink="/danh-sach/phim-chieu-rap"
       />
 
       {/* Section 2: PHIM BỘ */}
       <MovieSection
         title="PHIM BỘ"
-        movies={phimBoMovies.slice(0, moviesToShow)}
-        tabs={['2025', '2024', '2023', '2022']}
+        movies={phimBoMovies}
+        tabs={['Hàn Quốc', 'Trung Quốc', 'Âu - Mỹ', 'Phim Bộ Full']}
         cdnUrl={cdnUrl}
-        selectedTab="2025"
-        onTabChange={() => {}}
+        selectedTab={selectedSeriesTab}
+        onTabChange={setSelectedSeriesTab}
+        filterFn={(movie, tab) => {
+          if (!tab) return true;
+          if (tab === 'Phim Bộ Full') return isFullSeries(movie);
+          if (tab === 'Âu - Mỹ') return hasCountry(movie, 'Âu Mỹ');
+          return hasCountry(movie, tab);
+        }}
+        limit={moviesToShow}
         viewAllLink="/danh-sach/phim-bo"
       />
 
       {/* Section 3: PHIM LẺ */}
       <MovieSection
         title="PHIM LẺ"
-        movies={phimLeMovies.slice(0, moviesToShow)}
-        tabs={['2025', '2024', '2023', '2022']}
+        movies={phimLeMovies}
+        tabs={['Hành Động', 'Kinh Dị', 'Hài Hước']}
         cdnUrl={cdnUrl}
-        selectedTab="2025"
-        onTabChange={() => {}}
+        selectedTab={selectedSingleTab}
+        onTabChange={setSelectedSingleTab}
+        filterFn={(movie, tab) => (!tab ? true : hasCategory(movie, tab))}
+        limit={moviesToShow}
         viewAllLink="/danh-sach/phim-le"
       />
 
       {/* Section 4: PHIM HOẠT HÌNH */}
       <MovieSection
         title="PHIM HOẠT HÌNH"
-        movies={phimHoatHinhMovies.slice(0, moviesToShow)}
-        tabs={['2025', '2024', '2023', '2022']}
+        movies={phimHoatHinhMovies}
+        tabs={[]}
         cdnUrl={cdnUrl}
-        selectedTab="2025"
+        selectedTab=""
         onTabChange={() => {}}
+        limit={moviesToShow}
         viewAllLink="/danh-sach/hoat-hinh"
       />
     </div>
