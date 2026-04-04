@@ -1069,15 +1069,58 @@ button {
   .movie-grid-container { padding: 90px 3vw 30px; }
   .grid-title { font-size: 1.3rem; }
 
+  .billboard {
+    height: clamp(640px, 92vh, 760px);
+    background-position: center top;
+  }
+
+  .billboard-info {
+    top: 16%;
+    left: 4vw;
+    right: 4vw;
+    width: auto;
+  }
+
+  .billboard-title {
+    font-size: clamp(2.7rem, 13vw, 4rem);
+    line-height: 0.95;
+    margin-bottom: 12px;
+    display: -webkit-box;
+    -webkit-line-clamp: 4;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  .billboard-desc {
+    font-size: clamp(1rem, 5.4vw, 1.35rem);
+    line-height: 1.25;
+    margin-bottom: 14px;
+    -webkit-line-clamp: 2;
+  }
+
+  .billboard-buttons {
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+
+  .btn {
+    font-size: 1.05rem;
+    padding: 9px 16px;
+  }
+
   .billboard-thumbs {
-    right: 3vw;
-    bottom: 74px;
+    left: 4vw;
+    right: 4vw;
+    bottom: 116px;
     gap: 8px;
+    overflow-x: auto;
+    padding-bottom: 2px;
   }
 
   .billboard-thumb {
-    width: 80px;
-    height: 46px;
+    flex: 0 0 78px;
+    width: 78px;
+    height: 44px;
   }
 }
 
