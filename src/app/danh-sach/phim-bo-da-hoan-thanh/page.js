@@ -8,6 +8,7 @@ export default function PhimBoDaHoanThanhPage() {
   const [movies, setMovies] = useState([]);
   const [cdnUrl, setCdnUrl] = useState('');
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
 
   useEffect(() => {
     const fetchMovies = async () => {
@@ -15,39 +16,52 @@ export default function PhimBoDaHoanThanhPage() {
         setLoading(true);
         let allMovies = [];
         let allCdnUrl = '';
-        const seenIds = new Set();
 
-        // Fetch phim-bo-da-hoan-thanh
-        for (let page = 1; page <= 10; page++) {
-          try {
-            const res = await fetch(`https://ophim1.com/v1/api/danh-sach/phim-bo-da-hoan-thanh?page=${page}`);
-            const json = await res.json();
+        // Fetch first page immediately for quick initial load
+        try {
+          const res1 = await fetch(`https://ophim1.com/v1/api/danh-sach/phim-bo-da-hoan-thanh?page=1`);
+          const json1 = await res1.json();
 
-            if (json.status === 'success' && json.data?.items) {
-              const uniqueMovies = json.data.items.filter(movie => {
-                if (!movie._id || !movie.name) return false;
-                if (seenIds.has(movie._id)) return false;
-                seenIds.add(movie._id);
-                return true;
-              });
-              allMovies = [...allMovies, ...uniqueMovies];
-              if (!allCdnUrl) allCdnUrl = json.data.APP_DOMAIN_CDN_IMAGE;
-            } else {
-              break;
-            }
-          } catch (err) {
-            if (page === 1) console.error('Failed to fetch phim-bo-da-hoan-thanh:', err);
-            break;
+          if (json1.status === 'success' && json1.data?.items) {
+            const filteredItems = json1.data.items.filter(movie => movie._id && movie.name);
+            allMovies = [...filteredItems];
+            allCdnUrl = json1.data.APP_DOMAIN_CDN_IMAGE;
           }
+        } catch (err) {
+          console.error('Failed to fetch phim-bo-da-hoan-thanh page 1:', err);
         }
 
         setCdnUrl(allCdnUrl || 'https://img.ophim.live');
         setMovies(allMovies);
+        setLoading(false);
+
+        // Load remaining pages in background (parallel fetch)
+        setLoadingMore(true);
+        const promises = [];
+        for (let page = 2; page <= 10; page++) {
+          promises.push(
+            fetch(`https://ophim1.com/v1/api/danh-sach/phim-bo-da-hoan-thanh?page=${page}`)
+              .then(res => res.json())
+              .catch(err => ({ status: 'error', err }))
+          );
+        }
+
+        const results = await Promise.all(promises);
+        results.forEach(json => {
+          if (json.status === 'success' && json.data?.items) {
+            const filteredItems = json.data.items.filter(movie => movie._id && movie.name);
+            setMovies(prev => {
+              const existingIds = new Set(prev.map(m => m._id));
+              return [...prev, ...filteredItems.filter(m => !existingIds.has(m._id))];
+            });
+          }
+        });
+        setLoadingMore(false);
       } catch (err) {
         console.error('Lỗi tải phim bộ đã hoàn thành:', err);
         setMovies([]);
-      } finally {
         setLoading(false);
+        setLoadingMore(false);
       }
     };
 

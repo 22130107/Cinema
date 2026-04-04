@@ -485,6 +485,12 @@ button {
   margin: 0;
 }
 
+@media (max-width: 768px) {
+  .section-wrapper {
+    padding: 25px 3vw;
+  }
+}
+
 .section-header {
   display: flex;
   align-items: center;
@@ -500,6 +506,12 @@ button {
   margin: 0;
   white-space: nowrap;
   letter-spacing: 0.5px;
+}
+
+@media (max-width: 768px) {
+  .section-title {
+    font-size: 1.1rem;
+  }
 }
 
 .category-tabs {
@@ -568,6 +580,13 @@ button {
   scrollbar-width: none;
 }
 
+@media (max-width: 768px) {
+  .movies-row {
+    gap: 8px;
+    padding: 8px 0;
+  }
+}
+
 .movies-row::-webkit-scrollbar {
   display: none;
 }
@@ -580,6 +599,20 @@ button {
   cursor: pointer;
   flex: 0 0 calc((100% / 8) - 10.5px);
   min-width: calc((100vw / 8) - 10.5px);
+}
+
+@media (max-width: 768px) {
+  .grid-poster-card-row {
+    flex: 0 0 calc((100% / 4) - 9px);
+    min-width: calc((100vw / 4) - 9px);
+  }
+}
+
+@media (max-width: 480px) {
+  .grid-poster-card-row {
+    flex: 0 0 calc((100% / 3) - 8px);
+    min-width: calc((100vw / 3) - 8px);
+  }
 }
 
 .grid-poster-card {
@@ -661,6 +694,20 @@ button {
   margin: 0;
   transition: color 0.2s ease;
   line-height: 1.3;
+}
+
+@media (max-width: 768px) {
+  .grid-poster-title {
+    font-size: 0.8rem;
+    white-space: normal;
+    overflow: visible;
+    text-overflow: clip;
+    line-height: 1.2;
+    margin-top: 6px;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+  }
 }
 
 .movie-year {
@@ -818,6 +865,20 @@ button {
   gap: 20px;
 }
 
+@media (max-width: 768px) {
+  .grid {
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    gap: 12px;
+  }
+}
+
+@media (max-width: 480px) {
+  .grid {
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+  }
+}
+
 .grid-item {
   width: 100%;
 }
@@ -845,7 +906,8 @@ button {
   .poster-card { width: calc(100% / 3 - 8px); }
   .billboard-info { width: 90%; }
   .nav-links { display: none; }
-  .grid { grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); }
   .movie-list-grid { grid-template-columns: repeat(1, 1fr); min-width: 200px; }
+  .movie-grid-container { padding: 90px 3vw 30px; }
+  .grid-title { font-size: 1.3rem; }
 }
 

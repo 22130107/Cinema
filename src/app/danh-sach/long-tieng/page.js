@@ -8,6 +8,7 @@ export default function LongTiengPage() {
   const [movies, setMovies] = useState([]);
   const [cdnUrl, setCdnUrl] = useState('');
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
 
   useEffect(() => {
     const fetchMovies = async () => {
@@ -17,50 +18,83 @@ export default function LongTiengPage() {
         let allCdnUrl = '';
         const seenIds = new Set();
 
-        // Fetch phim with long tieng (dubbing) - fetch more pages
+        // Fetch first page from each endpoint (3 pages of data)
         const endpoints = ['phim-moi', 'phim-bo', 'phim-le'];
         for (const endpoint of endpoints) {
-          for (let page = 1; page <= 10; page++) {
-            try {
-              const res = await fetch(`https://ophim1.com/v1/api/danh-sach/${endpoint}?page=${page}`);
-              const json = await res.json();
+          try {
+            const res = await fetch(`https://ophim1.com/v1/api/danh-sach/${endpoint}?page=1`);
+            const json = await res.json();
 
-              if (json.status === 'success' && json.data?.items) {
-                // Filter movies with long tieng (dubbed)
-                const uniqueMovies = json.data.items
-                  .filter(movie => {
-                    // Check multiple fields for dubbed content
-                    const lang = String(movie.lang || '').toLowerCase();
-                    const quality = String(movie.quality || '').toLowerCase();
-                    const episode = String(movie.episode_current || '').toLowerCase();
-                    
-                    return lang.includes('lồng') || 
-                           lang.includes('dubbed') ||
-                           quality.includes('lồng') ||
-                           episode.includes('lồng');
-                  })
-                  .filter(movie => {
-                    if (!movie._id || !movie.name) return false;
-                    if (seenIds.has(movie._id)) return false;
-                    seenIds.add(movie._id);
-                    return true;
-                  });
-                allMovies = [...allMovies, ...uniqueMovies];
-                if (!allCdnUrl) allCdnUrl = json.data.APP_DOMAIN_CDN_IMAGE;
-              }
-            } catch (err) {
-              continue;
+            if (json.status === 'success' && json.data?.items) {
+              const uniqueMovies = json.data.items
+                .filter(movie => {
+                  const lang = String(movie.lang || '').toLowerCase();
+                  const quality = String(movie.quality || '').toLowerCase();
+                  const episode = String(movie.episode_current || '').toLowerCase();
+                  
+                  return lang.includes('lồng') || 
+                         lang.includes('dubbed') ||
+                         quality.includes('lồng') ||
+                         episode.includes('lồng');
+                })
+                .filter(movie => {
+                  if (!movie._id || !movie.name) return false;
+                  if (seenIds.has(movie._id)) return false;
+                  seenIds.add(movie._id);
+                  return true;
+                });
+              allMovies = [...allMovies, ...uniqueMovies];
+              if (!allCdnUrl) allCdnUrl = json.data.APP_DOMAIN_CDN_IMAGE;
             }
+          } catch (err) {
+            continue;
           }
         }
 
         setCdnUrl(allCdnUrl || 'https://img.ophim.live');
         setMovies(allMovies);
+        setLoading(false);
+
+        // Load remaining pages in background (all 30 pages in parallel)
+        setLoadingMore(true);
+        const promises = [];
+        for (const endpoint of endpoints) {
+          for (let page = 2; page <= 10; page++) {
+            promises.push(
+              fetch(`https://ophim1.com/v1/api/danh-sach/${endpoint}?page=${page}`)
+                .then(res => res.json())
+                .catch(err => ({ status: 'error', err }))
+            );
+          }
+        }
+
+        const results = await Promise.all(promises);
+        results.forEach(json => {
+          if (json.status === 'success' && json.data?.items) {
+            const filteredItems = json.data.items
+              .filter(movie => {
+                const lang = String(movie.lang || '').toLowerCase();
+                const quality = String(movie.quality || '').toLowerCase();
+                const episode = String(movie.episode_current || '').toLowerCase();
+                
+                return lang.includes('lồng') || 
+                       lang.includes('dubbed') ||
+                       quality.includes('lồng') ||
+                       episode.includes('lồng');
+              })
+              .filter(movie => movie._id && movie.name);
+            setMovies(prev => {
+              const existingIds = new Set(prev.map(m => m._id));
+              return [...prev, ...filteredItems.filter(m => !existingIds.has(m._id))];
+            });
+          }
+        });
+        setLoadingMore(false);
       } catch (err) {
         console.error('Lỗi tải phim lồng tiếng:', err);
         setMovies([]);
-      } finally {
         setLoading(false);
+        setLoadingMore(false);
       }
     };
 

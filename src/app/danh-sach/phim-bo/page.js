@@ -7,6 +7,7 @@ export default function PhimBoPage() {
   const [movies, setMovies] = useState([]);
   const [cdnUrl, setCdnUrl] = useState('');
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
 
   useEffect(() => {
     const fetchMovies = async () => {
@@ -15,27 +16,46 @@ export default function PhimBoPage() {
         let allMovies = [];
         let allCdnUrl = '';
 
-        // Fetch 10 pages to get comprehensive dataset for filtering
-        for (let page = 1; page <= 10; page++) {
-          const res = await fetch(`https://ophim1.com/v1/api/danh-sach/phim-bo?page=${page}`);
-          const json = await res.json();
+        // Fetch first page immediately for quick initial load
+        const res1 = await fetch(`https://ophim1.com/v1/api/danh-sach/phim-bo?page=1`);
+        const json1 = await res1.json();
 
-          if (json.status === 'success') {
-            // Filter by type: series
-            const filteredItems = (json.data.items || []).filter(movie => movie.type === 'series');
-            allMovies = [...allMovies, ...filteredItems];
-            if (!allCdnUrl) {
-              allCdnUrl = json.data.APP_DOMAIN_CDN_IMAGE;
-            }
-          }
+        if (json1.status === 'success') {
+          const filteredItems = (json1.data.items || []).filter(movie => movie.type === 'series');
+          allMovies = [...allMovies, ...filteredItems];
+          allCdnUrl = json1.data.APP_DOMAIN_CDN_IMAGE;
         }
 
         setCdnUrl(allCdnUrl);
         setMovies(allMovies);
+        setLoading(false);
+
+        // Load remaining pages in background (parallel fetch)
+        setLoadingMore(true);
+        const promises = [];
+        for (let page = 2; page <= 10; page++) {
+          promises.push(
+            fetch(`https://ophim1.com/v1/api/danh-sach/phim-bo?page=${page}`)
+              .then(res => res.json())
+              .catch(err => ({ status: 'error', err }))
+          );
+        }
+
+        const results = await Promise.all(promises);
+        results.forEach(json => {
+          if (json.status === 'success') {
+            const filteredItems = (json.data.items || []).filter(movie => movie.type === 'series');
+            setMovies(prev => {
+              const existingIds = new Set(prev.map(m => m._id));
+              return [...prev, ...filteredItems.filter(m => !existingIds.has(m._id))];
+            });
+          }
+        });
+        setLoadingMore(false);
       } catch (err) {
         console.error('Lỗi tải danh sách phim bộ:', err);
-      } finally {
         setLoading(false);
+        setLoadingMore(false);
       }
     };
 

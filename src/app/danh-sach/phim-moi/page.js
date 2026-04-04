@@ -8,6 +8,7 @@ export default function PhimMoiPage() {
   const [movies, setMovies] = useState([]);
   const [cdnUrl, setCdnUrl] = useState('');
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
 
   useEffect(() => {
     const fetchMovies = async () => {
@@ -15,32 +16,47 @@ export default function PhimMoiPage() {
         setLoading(true);
         let allMovies = [];
         let allCdnUrl = '';
-        const seenIds = new Set();
 
-        // Fetch 10 pages from phim-moi endpoint
-        for (let page = 1; page <= 10; page++) {
-          const res = await fetch(`https://ophim1.com/v1/api/danh-sach/phim-moi?page=${page}`);
-          const json = await res.json();
+        // Fetch first page immediately for quick initial load
+        const res1 = await fetch(`https://ophim1.com/v1/api/danh-sach/phim-moi?page=1`);
+        const json1 = await res1.json();
 
-          if (json.status === 'success') {
-            const uniqueMovies = (json.data.items || []).filter(movie => {
-              if (seenIds.has(movie._id)) return false;
-              seenIds.add(movie._id);
-              return true;
-            });
-            allMovies = [...allMovies, ...uniqueMovies];
-            if (!allCdnUrl) {
-              allCdnUrl = json.data.APP_DOMAIN_CDN_IMAGE;
-            }
-          }
+        if (json1.status === 'success') {
+          const filteredItems = (json1.data.items || []).filter(movie => movie._id);
+          allMovies = [...allMovies, ...filteredItems];
+          allCdnUrl = json1.data.APP_DOMAIN_CDN_IMAGE;
         }
 
         setCdnUrl(allCdnUrl);
         setMovies(allMovies);
+        setLoading(false);
+
+        // Load remaining pages in background (parallel fetch)
+        setLoadingMore(true);
+        const promises = [];
+        for (let page = 2; page <= 10; page++) {
+          promises.push(
+            fetch(`https://ophim1.com/v1/api/danh-sach/phim-moi?page=${page}`)
+              .then(res => res.json())
+              .catch(err => ({ status: 'error', err }))
+          );
+        }
+
+        const results = await Promise.all(promises);
+        results.forEach(json => {
+          if (json.status === 'success') {
+            const filteredItems = (json.data.items || []).filter(movie => movie._id);
+            setMovies(prev => {
+              const existingIds = new Set(prev.map(m => m._id));
+              return [...prev, ...filteredItems.filter(m => !existingIds.has(m._id))];
+            });
+          }
+        });
+        setLoadingMore(false);
       } catch (err) {
         console.error('Lỗi tải phim mới:', err);
-      } finally {
         setLoading(false);
+        setLoadingMore(false);
       }
     };
 
