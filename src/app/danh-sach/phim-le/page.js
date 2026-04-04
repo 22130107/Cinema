@@ -21,8 +21,8 @@ export default function PhimLePage() {
           const json = await res.json();
 
           if (json.status === 'success') {
-            // Filter by type: phimle
-            const filteredItems = (json.data.items || []).filter(movie => movie.type === 'phimle');
+            // Filter by type: single
+            const filteredItems = (json.data.items || []).filter(movie => movie.type === 'single');
             allMovies = [...allMovies, ...filteredItems];
             if (!allCdnUrl) {
               allCdnUrl = json.data.APP_DOMAIN_CDN_IMAGE;

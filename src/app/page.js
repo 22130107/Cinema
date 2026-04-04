@@ -98,16 +98,31 @@ export default function Home() {
   const [featuredMovie, setFeaturedMovie] = useState(null);
   const [cdnUrl, setCdnUrl] = useState('');
   const [allMovies, setAllMovies] = useState([]);
-  const [countryTabs, setCountryTabs] = useState([]);
-  const [selectedCountry, setSelectedCountry] = useState(null);
-  const [genreTabs, setGenreTabs] = useState([]);
-  const [selectedGenre, setSelectedGenre] = useState(null);
+  const [windowWidth, setWindowWidth] = useState(typeof window !== 'undefined' ? window.innerWidth : 1024);
   
   const [phimChieuRapMovies, setPhimChieuRapMovies] = useState([]);
   const [phimBoMovies, setPhimBoMovies] = useState([]);
   const [phimLeMovies, setPhimLeMovies] = useState([]);
   const [phimHoatHinhMovies, setPhimHoatHinhMovies] = useState([]);
 
+  // Calculate movies to show based on window width
+  const getMoviesToShow = () => {
+    if (windowWidth < 480) return 4;      // Mobile: 4 phim
+    if (windowWidth < 768) return 6;      // Small tablet: 6 phim
+    if (windowWidth < 1024) return 8;     // Tablet: 8 phim
+    return 14;                             // Desktop: 14 phim
+  };
+
+  const moviesToShow = getMoviesToShow();
+
+  // Handle window resize
+  useEffect(() => {
+    const handleResize = () => setWindowWidth(window.innerWidth);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  // Fetch movies data
   useEffect(() => {
     const fetchAllData = async () => {
       try {
@@ -130,7 +145,7 @@ export default function Home() {
         const chieuRapRes = await fetch('https://ophim1.com/v1/api/danh-sach/phim-chieu-rap?page=1');
         const chieuRapJson = await chieuRapRes.json();
         if (chieuRapJson.status === 'success') {
-          const movies = (chieuRapJson.data.items || []).slice(0, 14);
+          const movies = (chieuRapJson.data.items || []).slice(0, 20);
           setPhimChieuRapMovies(movies);
         }
         
@@ -138,7 +153,7 @@ export default function Home() {
         const boRes = await fetch('https://ophim1.com/v1/api/danh-sach/phim-bo?page=1');
         const boJson = await boRes.json();
         if (boJson.status === 'success') {
-          const movies = (boJson.data.items || []).slice(0, 14);
+          const movies = (boJson.data.items || []).slice(0, 20);
           setPhimBoMovies(movies);
         }
         
@@ -146,7 +161,7 @@ export default function Home() {
         const leRes = await fetch('https://ophim1.com/v1/api/danh-sach/phim-le?page=1');
         const leJson = await leRes.json();
         if (leJson.status === 'success') {
-          const movies = (leJson.data.items || []).slice(0, 14);
+          const movies = (leJson.data.items || []).slice(0, 20);
           setPhimLeMovies(movies);
         }
         
@@ -154,7 +169,7 @@ export default function Home() {
         const hoatHinhRes = await fetch('https://ophim1.com/v1/api/danh-sach/hoat-hinh?page=1');
         const hoatHinhJson = await hoatHinhRes.json();
         if (hoatHinhJson.status === 'success') {
-          const movies = (hoatHinhJson.data.items || []).slice(0, 14);
+          const movies = (hoatHinhJson.data.items || []).slice(0, 20);
           setPhimHoatHinhMovies(movies);
         }
         
@@ -165,14 +180,6 @@ export default function Home() {
 
     fetchAllData();
   }, []);
-
-  const handleGenreChange = (genre) => {
-    setSelectedGenre(genre);
-  };
-
-  const handleCountryChange = (country) => {
-    setSelectedCountry(country);
-  };
 
   const billboardImg = featuredMovie ? `${cdnUrl}/uploads/movies/${featuredMovie.thumb_url}` : '';
 
@@ -204,7 +211,7 @@ export default function Home() {
       {/* Section 1: PHIM CHIẾU RẠP MỚI */}
       <MovieSection
         title="PHIM CHIẾU RẠP MỚI"
-        movies={phimChieuRapMovies}
+        movies={phimChieuRapMovies.slice(0, moviesToShow)}
         tabs={['2025', '2024', '2023', '2022']}
         cdnUrl={cdnUrl}
         selectedTab="2025"
@@ -215,7 +222,7 @@ export default function Home() {
       {/* Section 2: PHIM BỘ */}
       <MovieSection
         title="PHIM BỘ"
-        movies={phimBoMovies}
+        movies={phimBoMovies.slice(0, moviesToShow)}
         tabs={['2025', '2024', '2023', '2022']}
         cdnUrl={cdnUrl}
         selectedTab="2025"
@@ -226,7 +233,7 @@ export default function Home() {
       {/* Section 3: PHIM LẺ */}
       <MovieSection
         title="PHIM LẺ"
-        movies={phimLeMovies}
+        movies={phimLeMovies.slice(0, moviesToShow)}
         tabs={['2025', '2024', '2023', '2022']}
         cdnUrl={cdnUrl}
         selectedTab="2025"
@@ -237,7 +244,7 @@ export default function Home() {
       {/* Section 4: PHIM HOẠT HÌNH */}
       <MovieSection
         title="PHIM HOẠT HÌNH"
-        movies={phimHoatHinhMovies}
+        movies={phimHoatHinhMovies.slice(0, moviesToShow)}
         tabs={['2025', '2024', '2023', '2022']}
         cdnUrl={cdnUrl}
         selectedTab="2025"

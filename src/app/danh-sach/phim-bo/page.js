@@ -21,8 +21,8 @@ export default function PhimBoPage() {
           const json = await res.json();
 
           if (json.status === 'success') {
-            // Filter by type: phimbo
-            const filteredItems = (json.data.items || []).filter(movie => movie.type === 'phimbo');
+            // Filter by type: series
+            const filteredItems = (json.data.items || []).filter(movie => movie.type === 'series');
             allMovies = [...allMovies, ...filteredItems];
             if (!allCdnUrl) {
               allCdnUrl = json.data.APP_DOMAIN_CDN_IMAGE;
@@ -44,8 +44,8 @@ export default function PhimBoPage() {
 
   return (
     <div style={{ paddingTop: '100px', minHeight: '100vh', background: 'var(--background)' }}>
-      <div style={{ padding: '0 4vw' }}>
-        <h1 style={{ fontSize: '2rem', marginBottom: '30px', color: 'white' }}>Phim Bộ</h1>
+      <div style={{ padding: 'clamp(0px, 2vw, 20px)' }}>
+        <h1 style={{ fontSize: 'clamp(1.2rem, 5vw, 2rem)', marginBottom: '20px', color: 'white' }}>Phim Bộ</h1>
 
         {loading ? (
           <div style={{ textAlign: 'center', padding: '40px', color: '#999' }}>
