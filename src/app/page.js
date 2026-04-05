@@ -194,53 +194,46 @@ export default function Home() {
   useEffect(() => {
     const fetchAllData = async () => {
       try {
-        // Fetch home data (featured)
-        const homeRes = await fetch('https://ophim1.com/v1/api/home');
-        const homeJson = await homeRes.json();
-        
+        // Fetch tất cả 5 API song song cùng lúc
+        const [homeJson, chieuRapJson, boJson, leJson, hoatHinhJson] = await Promise.all([
+          fetch('https://ophim1.com/v1/api/home').then(r => r.json()),
+          fetch('https://ophim1.com/v1/api/danh-sach/phim-chieu-rap?page=1').then(r => r.json()),
+          fetch('https://ophim1.com/v1/api/danh-sach/phim-bo?page=1').then(r => r.json()),
+          fetch('https://ophim1.com/v1/api/danh-sach/phim-le?page=1').then(r => r.json()),
+          fetch('https://ophim1.com/v1/api/danh-sach/hoat-hinh?page=1').then(r => r.json()),
+        ]);
+
+        // Xử lý home data (featured)
         if (homeJson.status === 'success') {
           const fetchedMovies = homeJson.data.items;
           const cdn = homeJson.data.APP_DOMAIN_CDN_IMAGE;
           setCdnUrl(cdn);
           setAllMovies(fetchedMovies);
-
           if (fetchedMovies.length > 0) {
             setFeaturedMovie(fetchedMovies[0]);
           }
         }
-        
-        // Fetch phim chiếu rạp (cinema movies)
-        const chieuRapRes = await fetch('https://ophim1.com/v1/api/danh-sach/phim-chieu-rap?page=1');
-        const chieuRapJson = await chieuRapRes.json();
+
+        // Xử lý phim chiếu rạp
         if (chieuRapJson.status === 'success') {
-          const movies = (chieuRapJson.data.items || []).slice(0, 20);
-          setPhimChieuRapMovies(movies);
+          setPhimChieuRapMovies((chieuRapJson.data.items || []).slice(0, 20));
         }
-        
-        // Fetch phim bộ (series movies)
-        const boRes = await fetch('https://ophim1.com/v1/api/danh-sach/phim-bo?page=1');
-        const boJson = await boRes.json();
+
+        // Xử lý phim bộ
         if (boJson.status === 'success') {
-          const movies = (boJson.data.items || []).slice(0, 20);
-          setPhimBoMovies(movies);
+          setPhimBoMovies((boJson.data.items || []).slice(0, 20));
         }
-        
-        // Fetch phim lẻ (single movies)
-        const leRes = await fetch('https://ophim1.com/v1/api/danh-sach/phim-le?page=1');
-        const leJson = await leRes.json();
+
+        // Xử lý phim lẻ
         if (leJson.status === 'success') {
-          const movies = (leJson.data.items || []).slice(0, 20);
-          setPhimLeMovies(movies);
+          setPhimLeMovies((leJson.data.items || []).slice(0, 20));
         }
-        
-        // Fetch phim hoạt hình (animated movies)
-        const hoatHinhRes = await fetch('https://ophim1.com/v1/api/danh-sach/hoat-hinh?page=1');
-        const hoatHinhJson = await hoatHinhRes.json();
+
+        // Xử lý phim hoạt hình
         if (hoatHinhJson.status === 'success') {
-          const movies = (hoatHinhJson.data.items || []).slice(0, 20);
-          setPhimHoatHinhMovies(movies);
+          setPhimHoatHinhMovies((hoatHinhJson.data.items || []).slice(0, 20));
         }
-        
+
       } catch (err) {
         console.error('Lỗi khi gọi API:', err);
       }
