@@ -1,5 +1,6 @@
 import './globals.css';
-import Navbar from '../components/Navbar';
+import Navbar from '@/components/Navbar';
+import Footer from '@/components/Footer';
 
 export const metadata = {
   title: 'FLIX - Xem phim miễn phí',
@@ -8,16 +9,14 @@ export const metadata = {
 
 export default function RootLayout({ children }) {
   return (
-    <html lang="vi">
-      <body>
+    <html lang="vi" suppressHydrationWarning>
+      <body suppressHydrationWarning>
         <div className="app-container">
           <Navbar />
-          <main className="main-content" style={{ minHeight: '100vh', paddingBottom: '60px' }}>
+          <main className="main-content">
             {children}
           </main>
-          <footer style={{ padding: '60px 4vw', color: 'var(--text-muted)', fontSize: '0.9rem', textAlign: 'center', background: '#111' }}>
-            <p>Phát triển bởi Bằng API ophim. Next.js SSR Version.</p>
-          </footer>
+          <Footer />
         </div>
       </body>
     </html>

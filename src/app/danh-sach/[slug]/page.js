@@ -1,9 +1,10 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import HeroSlider from '../../../components/HeroSlider';
-import MovieListingClient from '../../../components/MovieListingClient';
+import HeroSlider from '@/components/HeroSlider';
+import MovieListingClient from '@/components/MovieListingClient';
 import { useParams } from 'next/navigation';
+import { API_BASE_URL, CDN_FALLBACK, HERO_SLIDER_COUNT } from '@/constants/config';
 
 export default function DanhSachPage() {
   const params = useParams();
@@ -39,7 +40,7 @@ export default function DanhSachPage() {
       const fetchPage = async (page) => {
         try {
           const res = await fetch(
-            `https://ophim1.com/v1/api/danh-sach/${slug}?page=${page}`,
+            `${API_BASE_URL}/danh-sach/${slug}?page=${page}`,
             { signal, cache: 'no-store' }
           );
           if (!res.ok) return null;
@@ -51,7 +52,7 @@ export default function DanhSachPage() {
         }
       };
 
-      // --- Bước 1: Fetch trang 1 ngay, hiển thị ngay ---
+      // Bước 1: Fetch trang 1, hiển thị ngay
       const firstJson = await fetchPage(1);
       if (signal.aborted) return;
 
@@ -65,14 +66,14 @@ export default function DanhSachPage() {
         seenIds.add(m._id);
         return true;
       });
-      cdnSaved = firstJson.data.APP_DOMAIN_CDN_IMAGE || 'https://img.ophim.live';
+      cdnSaved = firstJson.data.APP_DOMAIN_CDN_IMAGE || CDN_FALLBACK;
 
       setCdnUrl(cdnSaved);
       setMovies(firstItems);
       setTotalLoaded(firstItems.length);
-      setLoading(false); // ← Hiển thị ngay sau trang 1
+      setLoading(false);
 
-      // --- Bước 2: Fetch trang 2–10 song song ngầm ---
+      // Bước 2: Fetch trang 2–10 song song ngầm
       setLoadingMore(true);
       const pageNumbers = [2, 3, 4, 5, 6, 7, 8, 9, 10];
       const results = await Promise.allSettled(
@@ -105,65 +106,32 @@ export default function DanhSachPage() {
     };
   }, [slug]);
 
-  const sliderMovies = movies.slice(0, 8);
+  const sliderMovies = movies.slice(0, HERO_SLIDER_COUNT);
 
   return (
     <div style={{ paddingBottom: '40px' }}>
-      {/* Hero Slider */}
       <HeroSlider movies={sliderMovies} cdnUrl={cdnUrl} />
 
-      <div style={{ padding: '40px 4vw 0' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '30px', flexWrap: 'wrap' }}>
-          <h1 style={{ fontSize: '2rem', margin: 0, textTransform: 'capitalize' }}>{title}</h1>
-          {loadingMore && (
-            <span style={{
-              fontSize: '0.85rem',
-              color: '#e74c3c',
-              background: 'rgba(231,76,60,0.12)',
-              border: '1px solid rgba(231,76,60,0.3)',
-              padding: '4px 12px',
-              borderRadius: '20px',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px',
-            }}>
-              <span style={{ display: 'inline-block', width: 8, height: 8, borderRadius: '50%', background: '#e74c3c', animation: 'pulse 1s infinite' }} />
-              Đang tải thêm...
-            </span>
-          )}
-          {!loading && !loadingMore && totalLoaded > 0 && (
-            <span style={{ fontSize: '0.85rem', color: '#888' }}>
-              {totalLoaded} phim
-            </span>
-          )}
-        </div>
+      <div className="listing-page-header">
+        <h1 className="listing-page-title">{title}</h1>
+        {loadingMore && (
+          <span className="loading-badge">
+            <span className="loading-dot" />
+            Đang tải thêm...
+          </span>
+        )}
+        {!loading && !loadingMore && totalLoaded > 0 && (
+          <span className="listing-page-count">{totalLoaded} phim</span>
+        )}
       </div>
 
-      <div style={{ padding: '0 4vw' }}>
+      <div className="listing-page-body">
         {loading ? (
-          // Skeleton loading khi chờ trang 1
-          <div style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))',
-            gap: '15px',
-          }}>
+          <div className="skeleton-grid">
             {Array.from({ length: 24 }).map((_, i) => (
-              <div key={i} style={{ borderRadius: '8px', overflow: 'hidden' }}>
-                <div style={{
-                  width: '100%',
-                  aspectRatio: '2/3',
-                  background: 'linear-gradient(90deg, #1a1a1a 25%, #252525 50%, #1a1a1a 75%)',
-                  backgroundSize: '200% 100%',
-                  animation: 'shimmer 1.5s infinite',
-                  borderRadius: '8px',
-                }} />
-                <div style={{
-                  height: '14px',
-                  background: '#252525',
-                  borderRadius: '4px',
-                  marginTop: '8px',
-                  width: '80%',
-                }} />
+              <div key={i} className="skeleton-card">
+                <div className="skeleton-image" />
+                <div className="skeleton-text" />
               </div>
             ))}
           </div>
@@ -177,17 +145,6 @@ export default function DanhSachPage() {
           />
         )}
       </div>
-
-      <style>{`
-        @keyframes shimmer {
-          0% { background-position: 200% 0; }
-          100% { background-position: -200% 0; }
-        }
-        @keyframes pulse {
-          0%, 100% { opacity: 1; }
-          50% { opacity: 0.3; }
-        }
-      `}</style>
     </div>
   );
 }

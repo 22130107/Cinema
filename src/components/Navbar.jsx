@@ -4,104 +4,16 @@ import { useState, useEffect, useRef } from 'react';
 import { Search, X, ChevronDown } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter, usePathname } from 'next/navigation';
-
-// Danh sách thể loại tĩnh khớp với OPhim API slugs
-const GENRES = [
-  { name: 'Hành Động', slug: 'hanh-dong' },
-  { name: 'Tình Cảm', slug: 'tinh-cam' },
-  { name: 'Hài Hước', slug: 'hai-huoc' },
-  { name: 'Cổ Trang', slug: 'co-trang' },
-  { name: 'Tâm Lý', slug: 'tam-ly' },
-  { name: 'Hình Sự', slug: 'hinh-su' },
-  { name: 'Chiến Tranh', slug: 'chien-tranh' },
-  { name: 'Thể Thao', slug: 'the-thao' },
-  { name: 'Võ Thuật', slug: 'vo-thuat' },
-  { name: 'Viễn Tưởng', slug: 'vien-tuong' },
-  { name: 'Phiêu Lưu', slug: 'phieu-luu' },
-  { name: 'Khoa Học', slug: 'khoa-hoc' },
-  { name: 'Ma - Kinh Dị', slug: 'kinh-di' },
-  { name: 'Âm Nhạc', slug: 'am-nhac' },
-  { name: 'Thần Thoại', slug: 'than-thoai' },
-  { name: 'Hoạt Hình', slug: 'hoat-hinh' },
-  { name: 'Truyền Hình', slug: 'truyen-hinh' },
-  { name: 'Chiếu Rạp', slug: 'phim-chieu-rap' },
-  { name: 'Anime', slug: 'anime' },
-  { name: 'Thuyết Minh', slug: 'thuyet-minh' },
-  { name: 'Gia Đình', slug: 'gia-dinh' },
-  { name: 'Tài Liệu', slug: 'tai-lieu' },
-  { name: 'Bí Ẩn', slug: 'bi-an' },
-  { name: 'Lịch Sử', slug: 'lich-su' },
-  { name: 'Tội Phạm', slug: 'toi-pham' },
-  { name: 'Giật Gân', slug: 'giat-gan' },
-  { name: 'Học Đường', slug: 'hoc-duong' },
-  { name: 'Đam Mỹ', slug: 'dam-my' },
-  { name: 'Bách Hợp', slug: 'bach-hop' },
-  { name: 'Xuyên Không', slug: 'xuyen-khong' },
-  { name: 'Chuyển Thể', slug: 'chuyen-the' },
-  { name: 'Siêu Nhiên', slug: 'sieu-nhien' },
-  { name: 'Tiểu Sử', slug: 'tieu-su' },
-  { name: 'Sitcom', slug: 'sitcom' },
-];
-
-// Quốc gia khớp với OPhim API slugs
-const COUNTRIES = [
-  { name: 'Trung Quốc', slug: 'trung-quoc' },
-  { name: 'Hàn Quốc', slug: 'han-quoc' },
-  { name: 'Nhật Bản', slug: 'nhat-ban' },
-  { name: 'Âu Mỹ', slug: 'au-my' },
-  { name: 'Thái Lan', slug: 'thai-lan' },
-  { name: 'Đài Loan', slug: 'dai-loan' },
-  { name: 'Hồng Kông', slug: 'hong-kong' },
-  { name: 'Ấn Độ', slug: 'an-do' },
-  { name: 'Anh', slug: 'anh' },
-  { name: 'Pháp', slug: 'phap' },
-  { name: 'Đức', slug: 'duc' },
-  { name: 'Tây Ban Nha', slug: 'tay-ban-nha' },
-  { name: 'Nga', slug: 'nga' },
-  { name: 'Thổ Nhĩ Kỳ', slug: 'tho-nhi-ky' },
-  { name: 'Indonesia', slug: 'indonesia' },
-  { name: 'Philippines', slug: 'philippines' },
-  { name: 'Ý', slug: 'y' },
-  { name: 'Úc', slug: 'uc' },
-  { name: 'Canada', slug: 'canada' },
-  { name: 'Tổng Hợp', slug: 'tong-hop' },
-];
-
-// Năm phát hành
-const currentYear = new Date().getFullYear();
-const YEARS = Array.from({ length: currentYear - 2009 }, (_, i) => currentYear - i);
-
-// Top Phim (dùng danh-sach API)
-const TOP_SECTIONS = [
-  { name: 'Phim HOT', slug: 'phim-bo', label: 'Phim Bộ HOT' },
-  { name: 'Phim Lẻ', slug: 'phim-le', label: 'Phim Lẻ' },
-  { name: 'Phim Bộ', slug: 'phim-bo', label: 'Phim Bộ' },
-  { name: 'Phim Hoàn Tất', slug: 'phim-bo-da-hoan-thanh', label: 'Hoàn Tất' },
-  { name: 'Phim Đang Chiếu', slug: 'phim-dang-chieu', label: 'Đang Chiếu' },
-  { name: 'Phim Sắp Chiếu', slug: 'phim-sap-chieu', label: 'Sắp Chiếu' },
-];
-
-// Danh Sách Phim
-const MOVIE_LISTS = [
-  { name: 'Phim Mới', slug: 'danh-sach/phim-moi' },
-  { name: 'Phim Bộ', slug: 'danh-sach/phim-bo' },
-  { name: 'Phim Lẻ', slug: 'danh-sach/phim-le' },
-  { name: 'Shows', slug: 'danh-sach/shows' },
-  { name: 'Hoạt Hình', slug: 'danh-sach/hoat-hinh' },
-  { name: 'Phim Vietsub', slug: 'danh-sach/vietsub' },
-  { name: 'Phim Thuyết Minh', slug: 'danh-sach/thuyet-minh' },
-  { name: 'Phim Lồng Tiếng', slug: 'danh-sach/long-tieng' },
-  { name: 'Phim Bộ Đã Hoàn Thành', slug: 'danh-sach/phim-bo-da-hoan-thanh' },
-  { name: 'Phim Bộ Đang Chiếu', slug: 'danh-sach/phim-bo-dang-chieu' },
-  { name: 'Phim Sắp Chiếu', slug: 'danh-sach/phim-sap-chieu' },
-  { name: 'Phim Chiếu Rạp', slug: 'danh-sach/phim-chieu-rap' },
-];
+import { GENRES, COUNTRIES, MOVIE_LISTS } from '@/constants/navigation';
+import { API_BASE_URL } from '@/constants/config';
+import { getImageUrl } from '@/lib/utils';
 
 const Navbar = () => {
   const [isScrolled, setIsScrolled] = useState(false);
   const [showSearch, setShowSearch] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [suggestions, setSuggestions] = useState([]);
+  const [suggestCdnUrl, setSuggestCdnUrl] = useState('');
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [isSuggesting, setIsSuggesting] = useState(false);
   const [activeDropdown, setActiveDropdown] = useState(null);
@@ -157,14 +69,15 @@ const Navbar = () => {
 
       try {
         const res = await fetch(
-          `https://ophim1.com/v1/api/tim-kiem?keyword=${encodeURIComponent(q)}&page=1`,
+          `${API_BASE_URL}/tim-kiem?keyword=${encodeURIComponent(q)}&page=1`,
           { signal: controller.signal }
         );
         const json = await res.json();
 
         if (json?.status === 'success') {
+          setSuggestCdnUrl(json?.data?.APP_DOMAIN_CDN_IMAGE || '');
           const items = Array.isArray(json?.data?.items) ? json.data.items : [];
-          setSuggestions(items.slice(0, 5));
+          setSuggestions(items.slice(0, 9));
         } else {
           setSuggestions([]);
         }
@@ -306,21 +219,37 @@ const Navbar = () => {
                 {isSuggesting && suggestions.length === 0 ? (
                   <div className="search-suggestion muted">Đang tìm...</div>
                 ) : (
-                  suggestions.map((movie) => (
-                    <button
-                      key={movie?._id || movie?.slug}
-                      type="button"
-                      className="search-suggestion"
-                      role="option"
-                      aria-selected="false"
-                      onClick={() => handleSelectSuggestion(movie?.slug)}
-                    >
-                      <span className="search-suggestion-title">{movie?.name || 'Không có tên'}</span>
-                      {movie?.year ? (
-                        <span className="search-suggestion-meta">{movie.year}</span>
-                      ) : null}
-                    </button>
-                  ))
+                  suggestions.map((movie) => {
+                    const imgSrc = getImageUrl(movie.thumb_url, suggestCdnUrl);
+                    return (
+                      <div key={movie?._id || movie?.slug} className="search-suggestion-wrapper">
+                        <button
+                          type="button"
+                          className="search-suggestion"
+                          role="option"
+                          aria-selected="false"
+                          onClick={() => handleSelectSuggestion(movie?.slug)}
+                        >
+                          <span className="search-suggestion-title">{movie?.name || 'Không có tên'}</span>
+                          {movie?.year ? (
+                            <span className="search-suggestion-meta">{movie.year}</span>
+                          ) : null}
+                        </button>
+                        
+                        <div className="search-suggestion-preview">
+                           <img src={imgSrc} alt={movie?.name || 'Poster'} className="search-preview-img"/>
+                           <div className="search-preview-info">
+                             <div className="preview-title">{movie?.name}</div>
+                             <div className="preview-meta">
+                               {movie?.origin_name && <span>{movie.origin_name}</span>}
+                               {movie?.year && <span>Năm: {movie.year}</span>}
+                               {movie?.quality && <span>Chất lượng: {movie.quality}</span>}
+                             </div>
+                           </div>
+                        </div>
+                      </div>
+                    );
+                  })
                 )}
               </div>
             )}

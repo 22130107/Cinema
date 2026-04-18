@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import Link from 'next/link';
+import { getImageUrl } from '@/lib/utils';
 
 export default function HeroSlider({ movies, cdnUrl }) {
   const [current, setCurrent] = useState(0);
@@ -38,9 +39,7 @@ export default function HeroSlider({ movies, cdnUrl }) {
   if (!movies || movies.length === 0) return null;
 
   const movie = movies[current];
-  const bg = movie.thumb_url?.startsWith('http')
-    ? movie.thumb_url
-    : `${cdnUrl}/uploads/movies/${movie.thumb_url}`;
+  const bg = getImageUrl(movie.thumb_url, cdnUrl);
 
   return (
     <div className="billboard" style={{ backgroundImage: `url(${bg})`, transition: 'background-image 0.5s ease-in-out' }}>
@@ -61,9 +60,9 @@ export default function HeroSlider({ movies, cdnUrl }) {
           </Link>
         </div>
       </div>
-      <div style={{ position: 'absolute', bottom: '20px', right: '4vw', display: 'flex', gap: '10px' }}>
-        <button onClick={() => { goPrev(); resetTimer(); }} style={{ padding: '10px', background: 'rgba(0,0,0,0.5)', color: 'white', border: 'none', borderRadius: '50%', cursor: 'pointer' }}>&#8249;</button>
-        <button onClick={() => { goNext(); resetTimer(); }} style={{ padding: '10px', background: 'rgba(0,0,0,0.5)', color: 'white', border: 'none', borderRadius: '50%', cursor: 'pointer' }}>&#8250;</button>
+      <div className="hero-slider-nav">
+        <button className="hero-slider-arrow" onClick={() => { goPrev(); resetTimer(); }}>&#8249;</button>
+        <button className="hero-slider-arrow" onClick={() => { goNext(); resetTimer(); }}>&#8250;</button>
       </div>
     </div>
   );

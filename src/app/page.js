@@ -3,118 +3,9 @@
 import { Play, Info } from 'lucide-react';
 import Link from 'next/link';
 import { useState, useEffect, useMemo } from 'react';
-
-function generateSlug(str) {
-  str = str.toLowerCase();
-  str = str.replace(/(à|á|ạ|ả|ã|â|ầ|ấ|ậ|ẩ|ẫ|ă|ằ|ắ|ặ|ẳ|ẵ)/g, 'a');
-  str = str.replace(/(è|é|ẹ|ẻ|ẽ|ê|ề|ế|ệ|ể|ễ)/g, 'e');
-  str = str.replace(/(ì|í|ị|ỉ|ĩ)/g, 'i');
-  str = str.replace(/(ò|ó|ọ|ỏ|õ|ô|ồ|ố|ộ|ổ|ỗ|ơ|ờ|ớ|ợ|ở|ỡ)/g, 'o');
-  str = str.replace(/(ù|ú|ụ|ủ|ũ|ư|ừ|ứ|ự|ử|ữ)/g, 'u');
-  str = str.replace(/(ỳ|ý|ỵ|ỷ|ỹ)/g, 'y');
-  str = str.replace(/(đ)/g, 'd');
-  str = str.replace(/([^a-z0-9-\s])/g, '');
-  str = str.replace(/(\s+)/g, '-');
-  str = str.replace(/^-+/g, '');
-  str = str.replace(/-+$/g, '');
-  return str;
-}
-
-const MovieSection = ({ title, movies, tabs, cdnUrl, selectedTab, onTabChange, viewAllLink, filterFn, limit }) => {
-  const getMovieRating = (movie) => {
-    const tmdb = Number(movie?.tmdb?.vote_average);
-    if (Number.isFinite(tmdb) && tmdb > 0) return tmdb;
-
-    const imdb = Number(movie?.imdb?.vote_average);
-    if (Number.isFinite(imdb) && imdb > 0) return imdb;
-
-    return null;
-  };
-
-  const filteredMovies = Array.isArray(movies)
-    ? movies.filter((m) => (typeof filterFn === 'function' ? filterFn(m, selectedTab) : true))
-    : [];
-
-  // Sort movies by year (newest first), then by rating (highest first)
-  const sortedMovies = [...filteredMovies].sort((a, b) => {
-    const yearA = a.year || 0;
-    const yearB = b.year || 0;
-    
-    // Sort by year first (descending - newer first)
-    if (yearA !== yearB) {
-      return yearB - yearA;
-    }
-    
-    // If same year, sort by rating (descending - highest first)
-    const ratingA = getMovieRating(a) ?? 0;
-    const ratingB = getMovieRating(b) ?? 0;
-    return ratingB - ratingA;
-  });
-
-  return (
-    <div className="section-wrapper">
-      <div className="section-header">
-        <h2 className="section-title">{title}</h2>
-        {tabs && tabs.length > 0 && (
-          <div className="category-tabs">
-            {tabs.map(tab => (
-              <button
-                key={tab}
-                className={`tab-btn ${selectedTab === tab ? 'active' : ''}`}
-                onClick={() => onTabChange(selectedTab === tab ? '' : tab)}
-              >
-                {tab}
-              </button>
-            ))}
-          </div>
-        )}
-        {viewAllLink && (
-          <Link href={viewAllLink} className="view-all-link">
-            Xem tất cả &#8250;
-          </Link>
-        )}
-      </div>
-
-      <div className="movies-row">
-        {sortedMovies && sortedMovies.length > 0 ? sortedMovies.slice(0, limit ?? sortedMovies.length).map(movie => {
-          const rating = getMovieRating(movie);
-          return (
-            <Link href={`/phim/${movie.slug}`} className="grid-poster-card-row" key={movie._id} title={movie.name}>
-              <div className="poster-container">
-                <img 
-                  src={`${cdnUrl}/uploads/movies/${movie.thumb_url}`} 
-                  alt={movie.name} 
-                  className="poster"
-                  loading="lazy"
-                />
-                {movie.quality && (
-                  <span className="quality-tag">{movie.quality}</span>
-                )}
-                {rating !== null && (
-                  <span className="rating-tag">⭐ {rating.toFixed(1)}</span>
-                )}
-
-                <span className="poster-play-btn" aria-hidden="true">
-                  <span className="poster-play-circle">
-                    <Play size={18} fill="currentColor" />
-                  </span>
-                </span>
-
-                <div className="poster-title-overlay">
-                  <h3 className="grid-poster-title" title={movie.name}>{movie.name}</h3>
-                </div>
-              </div>
-            </Link>
-          );
-        }) : (
-          <div style={{ color: '#999', padding: '20px' }}>
-            Đang tải phim...
-          </div>
-        )}
-      </div>
-    </div>
-  );
-};
+import MovieSection from '@/components/MovieSection';
+import { API_BASE_URL, CDN_FALLBACK, HERO_SLIDER_COUNT, HERO_AUTO_INTERVAL } from '@/constants/config';
+import { getImageUrl, normalize } from '@/lib/utils';
 
 export default function Home() {
   const [featuredMovie, setFeaturedMovie] = useState(null);
@@ -125,29 +16,28 @@ export default function Home() {
   const [cdnUrl, setCdnUrl] = useState('');
   const [allMovies, setAllMovies] = useState([]);
   const [windowWidth, setWindowWidth] = useState(typeof window !== 'undefined' ? window.innerWidth : 1024);
-  
+
   const [phimChieuRapMovies, setPhimChieuRapMovies] = useState([]);
   const [phimBoMovies, setPhimBoMovies] = useState([]);
   const [phimLeMovies, setPhimLeMovies] = useState([]);
   const [phimHoatHinhMovies, setPhimHoatHinhMovies] = useState([]);
 
-  // Filter tabs (home) - match sample-style UI
+  // Filter tabs (home)
   const [selectedCinemaYear, setSelectedCinemaYear] = useState('');
   const [selectedSeriesTab, setSelectedSeriesTab] = useState('');
   const [selectedSingleTab, setSelectedSingleTab] = useState('');
 
   // Calculate movies to show based on window width
   const getMoviesToShow = () => {
-    if (windowWidth < 480) return 4;      // Mobile: 4 phim
-    if (windowWidth < 768) return 6;      // Small tablet: 6 phim
-    if (windowWidth < 1024) return 8;     // Tablet: 8 phim
-    return 14;                             // Desktop: 14 phim
+    if (windowWidth < 480) return 4;
+    if (windowWidth < 768) return 6;
+    if (windowWidth < 1024) return 8;
+    return 14;
   };
 
   const moviesToShow = getMoviesToShow();
 
-  const normalize = (s) => (s || '').toString().trim().toLowerCase();
-
+  // --- Helper functions cho filter ---
   const hasCategory = (movie, categoryName) => {
     if (!Array.isArray(movie?.category) || movie.category.length === 0) return true;
     return movie.category.some((c) => normalize(c?.name) === normalize(categoryName));
@@ -163,25 +53,16 @@ export default function Home() {
     return v.includes('full') || v.includes('hoan') || v.includes('hoàn') || v.includes('tron') || v.includes('trọn');
   };
 
-  const toAbsoluteMovieImage = (path, cdn) => {
-    if (!path) return '';
-    if (String(path).startsWith('http')) return path;
-    return `${cdn}/uploads/movies/${path}`;
-  };
-
+  // --- Hero slider ---
   const heroMovies = useMemo(() => (
-    Array.isArray(allMovies) ? allMovies.slice(0, 8) : []
+    Array.isArray(allMovies) ? allMovies.slice(0, HERO_SLIDER_COUNT) : []
   ), [allMovies]);
   const activeHeroMovie = heroMovies[heroIndex] || featuredMovie;
 
   const goToHero = (index) => {
     if (!heroMovies.length) return;
-    const nextIndex = (index + heroMovies.length) % heroMovies.length;
-    setHeroIndex(nextIndex);
+    setHeroIndex((index + heroMovies.length) % heroMovies.length);
   };
-
-  const goNextHero = () => goToHero(heroIndex + 1);
-  const goPrevHero = () => goToHero(heroIndex - 1);
 
   // Handle window resize
   useEffect(() => {
@@ -194,16 +75,14 @@ export default function Home() {
   useEffect(() => {
     const fetchAllData = async () => {
       try {
-        // Fetch tất cả 5 API song song cùng lúc
         const [homeJson, chieuRapJson, boJson, leJson, hoatHinhJson] = await Promise.all([
-          fetch('https://ophim1.com/v1/api/home').then(r => r.json()),
-          fetch('https://ophim1.com/v1/api/danh-sach/phim-chieu-rap?page=1').then(r => r.json()),
-          fetch('https://ophim1.com/v1/api/danh-sach/phim-bo?page=1').then(r => r.json()),
-          fetch('https://ophim1.com/v1/api/danh-sach/phim-le?page=1').then(r => r.json()),
-          fetch('https://ophim1.com/v1/api/danh-sach/hoat-hinh?page=1').then(r => r.json()),
+          fetch(`${API_BASE_URL}/home`).then(r => r.json()),
+          fetch(`${API_BASE_URL}/danh-sach/phim-chieu-rap?page=1`).then(r => r.json()),
+          fetch(`${API_BASE_URL}/danh-sach/phim-bo?page=1`).then(r => r.json()),
+          fetch(`${API_BASE_URL}/danh-sach/phim-le?page=1`).then(r => r.json()),
+          fetch(`${API_BASE_URL}/danh-sach/hoat-hinh?page=1`).then(r => r.json()),
         ]);
 
-        // Xử lý home data (featured)
         if (homeJson.status === 'success') {
           const fetchedMovies = homeJson.data.items;
           const cdn = homeJson.data.APP_DOMAIN_CDN_IMAGE;
@@ -214,26 +93,18 @@ export default function Home() {
           }
         }
 
-        // Xử lý phim chiếu rạp
         if (chieuRapJson.status === 'success') {
           setPhimChieuRapMovies((chieuRapJson.data.items || []).slice(0, 20));
         }
-
-        // Xử lý phim bộ
         if (boJson.status === 'success') {
           setPhimBoMovies((boJson.data.items || []).slice(0, 20));
         }
-
-        // Xử lý phim lẻ
         if (leJson.status === 'success') {
           setPhimLeMovies((leJson.data.items || []).slice(0, 20));
         }
-
-        // Xử lý phim hoạt hình
         if (hoatHinhJson.status === 'success') {
           setPhimHoatHinhMovies((hoatHinhJson.data.items || []).slice(0, 20));
         }
-
       } catch (err) {
         console.error('Lỗi khi gọi API:', err);
       }
@@ -242,15 +113,16 @@ export default function Home() {
     fetchAllData();
   }, []);
 
+  // Auto-slide hero
   useEffect(() => {
     if (heroMovies.length <= 1) return;
     const t = setInterval(() => {
       setHeroIndex((prev) => (prev + 1) % heroMovies.length);
-    }, 8000);
+    }, HERO_AUTO_INTERVAL);
     return () => clearInterval(t);
   }, [heroMovies.length]);
 
-  // Lấy poster cho dải thumbnail hero (ưu tiên poster_url từ API chi tiết)
+  // Lấy poster cho dải thumbnail hero
   useEffect(() => {
     const targets = heroMovies.slice(0, 6).filter((m) => m?.slug);
     if (!targets.length) return;
@@ -262,11 +134,11 @@ export default function Home() {
         const pairs = await Promise.all(
           targets.map(async (m) => {
             try {
-              const res = await fetch(`https://ophim1.com/v1/api/phim/${m.slug}`);
+              const res = await fetch(`${API_BASE_URL}/phim/${m.slug}`);
               const json = await res.json();
               const item = json?.movie || json?.data?.item;
-              const detailCdn = json?.data?.APP_DOMAIN_CDN_IMAGE || cdnUrl || 'https://img.ophim.live';
-              const poster = toAbsoluteMovieImage(item?.poster_url, detailCdn);
+              const detailCdn = json?.data?.APP_DOMAIN_CDN_IMAGE || cdnUrl || CDN_FALLBACK;
+              const poster = getImageUrl(item?.poster_url, detailCdn);
               return [m.slug, poster || ''];
             } catch {
               return [m.slug, ''];
@@ -284,18 +156,15 @@ export default function Home() {
           });
         }
       } catch {
-        // no-op: fallback sang poster_url/thumb_url local
+        // fallback sang poster_url/thumb_url local
       }
     };
 
     loadThumbPosters();
-
-    return () => {
-      canceled = true;
-    };
+    return () => { canceled = true; };
   }, [heroMovies, cdnUrl]);
 
-  // Lấy poster_url từ API chi tiết phim cho billboard trang chủ
+  // Lấy poster_url từ API chi tiết phim cho billboard
   useEffect(() => {
     if (!activeHeroMovie?.slug) return;
 
@@ -308,12 +177,11 @@ export default function Home() {
       }
 
       try {
-        const res = await fetch(`https://ophim1.com/v1/api/phim/${activeHeroMovie.slug}`);
+        const res = await fetch(`${API_BASE_URL}/phim/${activeHeroMovie.slug}`);
         const json = await res.json();
-
         const item = json?.movie || json?.data?.item;
-        const detailCdn = json?.data?.APP_DOMAIN_CDN_IMAGE || cdnUrl || 'https://img.ophim.live';
-        const poster = toAbsoluteMovieImage(item?.poster_url, detailCdn);
+        const detailCdn = json?.data?.APP_DOMAIN_CDN_IMAGE || cdnUrl || CDN_FALLBACK;
+        const poster = getImageUrl(item?.poster_url, detailCdn);
 
         if (!canceled && poster) {
           setFeaturedPosterUrl(poster);
@@ -321,22 +189,17 @@ export default function Home() {
         } else if (!canceled) {
           setFeaturedPosterStatus('failed');
         }
-      } catch (err) {
-        if (!canceled) {
-          setFeaturedPosterStatus('failed');
-        }
+      } catch {
+        if (!canceled) setFeaturedPosterStatus('failed');
       }
     };
 
     fetchFeaturedPoster();
-
-    return () => {
-      canceled = true;
-    };
+    return () => { canceled = true; };
   }, [activeHeroMovie?.slug, cdnUrl]);
 
   const fallbackThumb = activeHeroMovie
-    ? toAbsoluteMovieImage(activeHeroMovie.thumb_url, cdnUrl || 'https://img.ophim.live')
+    ? getImageUrl(activeHeroMovie.thumb_url, cdnUrl || CDN_FALLBACK)
     : '';
   const billboardImg = featuredPosterStatus === 'loaded'
     ? featuredPosterUrl
@@ -368,25 +231,23 @@ export default function Home() {
           </div>
 
           {heroMovies.length > 1 && (
-            <>
-              <div className="billboard-thumbs">
-                {heroMovies.slice(0, 6).map((m, idx) => {
-                  const thumbSrc = heroPosterBySlug[m?.slug]
-                    || toAbsoluteMovieImage(m?.poster_url || m?.thumb_url, cdnUrl || 'https://img.ophim.live');
-                  return (
-                    <button
-                      key={m._id || m.slug || idx}
-                      type="button"
-                      className={`billboard-thumb ${heroIndex === idx ? 'active' : ''}`}
-                      onClick={() => goToHero(idx)}
-                      title={m?.name || ''}
-                    >
-                      <img src={thumbSrc} alt={m?.name || 'movie'} />
-                    </button>
-                  );
-                })}
-              </div>
-            </>
+            <div className="billboard-thumbs">
+              {heroMovies.slice(0, 6).map((m, idx) => {
+                const thumbSrc = heroPosterBySlug[m?.slug]
+                  || getImageUrl(m?.poster_url || m?.thumb_url, cdnUrl || CDN_FALLBACK);
+                return (
+                  <button
+                    key={m._id || m.slug || idx}
+                    type="button"
+                    className={`billboard-thumb ${heroIndex === idx ? 'active' : ''}`}
+                    onClick={() => goToHero(idx)}
+                    title={m?.name || ''}
+                  >
+                    <img src={thumbSrc} alt={m?.name || 'movie'} />
+                  </button>
+                );
+              })}
+            </div>
           )}
         </header>
       )}

@@ -1,7 +1,8 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import MovieListingClient from '../../components/MovieListingClient';
+import MovieListingClient from '@/components/MovieListingClient';
+import { API_BASE_URL, CDN_FALLBACK } from '@/constants/config';
 
 export default function MovieListPage() {
   const [movies, setMovies] = useState([]);
@@ -15,7 +16,7 @@ export default function MovieListPage() {
 
     const fetchPage = async (page) => {
       try {
-        const res = await fetch(`https://ophim1.com/v1/api/danh-sach/phim-moi?page=${page}`);
+        const res = await fetch(`${API_BASE_URL}/danh-sach/phim-moi?page=${page}`);
         if (!res.ok) return null;
         const json = await res.json();
         if (json.status !== 'success' || !json.data?.items?.length) return null;
@@ -26,7 +27,6 @@ export default function MovieListPage() {
     };
 
     const fetchAll = async () => {
-      // --- Bước 1: Fetch trang 1 trước, hiển thị ngay ---
       const firstJson = await fetchPage(1);
       if (!firstJson) {
         setLoading(false);
@@ -38,14 +38,14 @@ export default function MovieListPage() {
         seenIds.add(m._id);
         return true;
       });
-      const cdn = firstJson.data.APP_DOMAIN_CDN_IMAGE || 'https://img.ophim.live';
+      const cdn = firstJson.data.APP_DOMAIN_CDN_IMAGE || CDN_FALLBACK;
 
       setCdnUrl(cdn);
       setMovies(firstItems);
       setTotalLoaded(firstItems.length);
-      setLoading(false); // ← Hiển thị ngay
+      setLoading(false);
 
-      // --- Bước 2: Fetch trang 2–10 song song ngầm ---
+      // Fetch trang 2–10 song song ngầm
       setLoadingMore(true);
       const results = await Promise.allSettled(
         [2, 3, 4, 5, 6, 7, 8, 9, 10].map((p) => fetchPage(p))
@@ -74,53 +74,26 @@ export default function MovieListPage() {
 
   return (
     <div style={{ paddingTop: '100px', minHeight: '100vh', background: 'var(--background)' }}>
-      <div style={{ padding: '0 4vw' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '30px', flexWrap: 'wrap' }}>
-          <h1 style={{ fontSize: '2rem', color: 'white', margin: 0 }}>Danh Sách Phim</h1>
+      <div className="listing-page-body">
+        <div className="listing-page-header" style={{ padding: 0 }}>
+          <h1 className="listing-page-title">Danh Sách Phim</h1>
           {loadingMore && (
-            <span style={{
-              fontSize: '0.85rem',
-              color: '#e74c3c',
-              background: 'rgba(231,76,60,0.12)',
-              border: '1px solid rgba(231,76,60,0.3)',
-              padding: '4px 12px',
-              borderRadius: '20px',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px',
-            }}>
-              <span style={{ display: 'inline-block', width: 8, height: 8, borderRadius: '50%', background: '#e74c3c', animation: 'pulse 1s infinite' }} />
+            <span className="loading-badge">
+              <span className="loading-dot" />
               Đang tải thêm...
             </span>
           )}
           {!loading && !loadingMore && totalLoaded > 0 && (
-            <span style={{ fontSize: '0.85rem', color: '#888' }}>{totalLoaded} phim</span>
+            <span className="listing-page-count">{totalLoaded} phim</span>
           )}
         </div>
 
         {loading ? (
-          <div style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))',
-            gap: '15px',
-          }}>
+          <div className="skeleton-grid">
             {Array.from({ length: 24 }).map((_, i) => (
-              <div key={i} style={{ borderRadius: '8px', overflow: 'hidden' }}>
-                <div style={{
-                  width: '100%',
-                  aspectRatio: '2/3',
-                  background: 'linear-gradient(90deg, #1a1a1a 25%, #252525 50%, #1a1a1a 75%)',
-                  backgroundSize: '200% 100%',
-                  animation: 'shimmer 1.5s infinite',
-                  borderRadius: '8px',
-                }} />
-                <div style={{
-                  height: '14px',
-                  background: '#252525',
-                  borderRadius: '4px',
-                  marginTop: '8px',
-                  width: '80%',
-                }} />
+              <div key={i} className="skeleton-card">
+                <div className="skeleton-image" />
+                <div className="skeleton-text" />
               </div>
             ))}
           </div>
@@ -134,17 +107,6 @@ export default function MovieListPage() {
           />
         )}
       </div>
-
-      <style>{`
-        @keyframes shimmer {
-          0% { background-position: 200% 0; }
-          100% { background-position: -200% 0; }
-        }
-        @keyframes pulse {
-          0%, 100% { opacity: 1; }
-          50% { opacity: 0.3; }
-        }
-      `}</style>
     </div>
   );
 }
